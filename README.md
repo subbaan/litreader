@@ -53,6 +53,7 @@ A terminal-based text file reader and library manager for text stories, rewritte
 
 #### Required
 - **Go 1.24 or later** - [Download Go](https://golang.org/dl/)
+- **txt files** - A number of .txt files inside Authorname/ folders.
 
 #### Optional (gracefully handled if missing)
 - **pandoc** - For rendering markdown files (falls back to plain text if unavailable)
@@ -146,6 +147,11 @@ editor = nano
 ### Usage
 - Press 'c' from the dashboard to edit the configuration file
 - Changes take effect after restarting the application
+- 'litreader -u' to scan the library
+- Use search to start with, add authors, add faves.
+- Use bookamrks to save favorite passages.
+- Explore an Authors files on disk, press a for fave authors and b to browse.
+
 
 ## Version
 
