@@ -1,0 +1,33 @@
+# Binaries
+litreader
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+*.out
+cmd/test-config/test-config
+cmd/test-paths/test-paths
+
+# Go workspace files
+go.work
+go.work.sum
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code personal settings
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Development and test files
+test_load.go
