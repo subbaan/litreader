@@ -116,20 +116,6 @@ litreader-go/
 └── go.mod
 ```
 
-## Features (From Python Version)
-
-- [x] Config loading/saving
-- [x] Cache management
-- [x] Python config compatibility
-- [ ] Dashboard view
-- [ ] File viewer with Pandoc
-- [ ] Search with ripgrep
-- [ ] Favorites management
-- [ ] Bookmarks management
-- [ ] Author management
-- [ ] Config editor
-- [ ] Export functionality
-
 ## Configuration
 
 The configuration file is located at `~/.config/litreader/litreader.conf` and uses a simple key-value format.
@@ -157,19 +143,9 @@ cache_expiry_days = 7
 editor = nano
 ```
 
-### Color Options
-Available colors: black, red, green, yellow, blue, magenta, cyan, white
-
 ### Usage
 - Press 'c' from the dashboard to edit the configuration file
 - Changes take effect after restarting the application
-
-## Migration from Python Version
-
-The Go version maintains full compatibility with the Python version's config file format. You can use both versions interchangeably during the transition.
-
-Config location: `~/.config/litreader/litreader.conf`
-Cache location: `~/.cache/litreader/`
 
 ## Version
 
