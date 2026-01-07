@@ -1,0 +1,54 @@
+package config
+
+import (
+	"github.com/subbass/litreader/internal/models"
+)
+
+const (
+	DefaultCacheExpiryDays = 7
+)
+
+// Config holds all configuration for litreader
+type Config struct {
+	SearchDir            string
+	ExportDir            string
+	Editor               string
+	UIColor              string
+	SelectorColor        string
+	SelectorReverse      bool
+	SelectorBold         bool
+	SelectorReverseColor string
+	ContentColor         string
+	ContentBold          bool
+	LastFile             string
+	Position             int
+	SearchText           string
+	CacheExpiryDays      int
+
+	Favorites       []models.Favorite
+	Bookmarks       []models.Bookmark
+	AuthorFavorites []string
+}
+
+// NewDefaultConfig returns a Config with default values
+func NewDefaultConfig() *Config {
+	return &Config{
+		SearchDir:            expandHome("~/Documents/"),
+		ExportDir:            expandHome("~/Documents/litreader_faves"),
+		Editor:               "nano",
+		UIColor:              "blue",
+		SelectorColor:        "yellow",
+		SelectorReverse:      true,
+		SelectorBold:         true,
+		SelectorReverseColor: "black",
+		ContentColor:         "white",
+		ContentBold:          false,
+		LastFile:             "",
+		Position:             0,
+		SearchText:           "",
+		CacheExpiryDays:      DefaultCacheExpiryDays,
+		Favorites:            []models.Favorite{},
+		Bookmarks:            []models.Bookmark{},
+		AuthorFavorites:      []string{},
+	}
+}
