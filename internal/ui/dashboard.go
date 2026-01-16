@@ -202,6 +202,10 @@ func (dm *DashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// TODO: Navigate to authors
 			return dm, nil
 
+		case "e":
+			// TODO: Navigate to explore authors
+			return dm, nil
+
 		case "c":
 			// TODO: Navigate to config
 			return dm, nil
@@ -228,7 +232,7 @@ func (dm *DashboardModel) View() string {
 	var b strings.Builder
 
 	// Title bar
-	title := GetAppName() + " v2.3.2 - Dashboard"
+	title := GetAppName() + " v2.4.6 - Dashboard"
 	b.WriteString(dm.styles.RenderTitle(title, dm.width))
 	b.WriteString("\n\n")
 
@@ -340,7 +344,7 @@ func (dm *DashboardModel) View() string {
 	}
 
 	// Key bindings bar
-	helpText := "↑↓:Scroll ↵:Open s:Search f:Favorites b:Bookmarks a:Authors c:Config l:Last q:Quit"
+	helpText := "↑↓:Scroll ↵:Open s:Search f:Fav b:Bmk a:Auth e:Explore c:Config l:Last q:Quit"
 	b.WriteString(dm.styles.RenderHelpBar(helpText, dm.width))
 
 	return b.String()

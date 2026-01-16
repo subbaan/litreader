@@ -19,6 +19,7 @@ const (
 	ViewAuthors
 	ViewAuthorFiles
 	ViewConfigEditor
+	ViewExploreAuthors
 )
 
 // App is the main bubbletea model
@@ -36,14 +37,15 @@ type App struct {
 	styles *Styles
 
 	// View-specific models
-	dashboard    *DashboardModel
-	search       *SearchModel
-	viewer       *ViewerModel
-	favorites    *FavoritesModel
-	bookmarks    *BookmarksModel
-	authors      *AuthorsModel
-	authorFiles  *AuthorFilesModel
-	configEditor *ConfigEditorModel
+	dashboard      *DashboardModel
+	search         *SearchModel
+	viewer         *ViewerModel
+	favorites      *FavoritesModel
+	bookmarks      *BookmarksModel
+	authors        *AuthorsModel
+	authorFiles    *AuthorFilesModel
+	configEditor   *ConfigEditorModel
+	exploreAuthors *ExploreAuthorsModel
 
 	// Modal/popup state
 	showPopup bool
@@ -126,6 +128,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.configEditor.width = msg.Width
 			a.configEditor.height = msg.Height
 		}
+		if a.exploreAuthors != nil {
+			a.exploreAuthors.width = msg.Width
+			a.exploreAuthors.height = msg.Height
+		}
 		return a, nil
 
 	case errMsg:
@@ -189,6 +195,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if a.configEditor != nil {
 			a.configEditor.styles = a.styles
+		}
+		if a.exploreAuthors != nil {
+			a.exploreAuthors.styles = a.styles
 		}
 		return a, nil
 	}
@@ -267,6 +276,14 @@ func (a *App) updateCurrentView(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.authorFiles = updated
 			}
 		}
+	case ViewExploreAuthors:
+		if a.exploreAuthors != nil {
+			var m tea.Model
+			m, cmd = a.exploreAuthors.Update(msg)
+			if updated, ok := m.(*ExploreAuthorsModel); ok {
+				a.exploreAuthors = updated
+			}
+		}
 	}
 
 	// After view handles it, check if we should navigate
@@ -327,6 +344,10 @@ func (a *App) View() string {
 		if a.authorFiles != nil {
 			return a.authorFiles.View()
 		}
+	case ViewExploreAuthors:
+		if a.exploreAuthors != nil {
+			return a.exploreAuthors.View()
+		}
 	}
 
 	return "Unknown view"
@@ -349,6 +370,8 @@ func (a *App) handleNavigation(key tea.KeyMsg) tea.Cmd {
 			return a.navigateTo(ViewBookmarks)
 		case "a":
 			return a.navigateTo(ViewAuthors)
+		case "e":
+			return a.navigateTo(ViewExploreAuthors)
 		case "c":
 			return a.navigateTo(ViewConfigEditor)
 		case "l":
@@ -432,6 +455,10 @@ func (a *App) navigateTo(view ViewType) tea.Cmd {
 		a.configEditor = NewConfigEditorModel(a.state, a.styles)
 		a.configEditor.width = a.width
 		a.configEditor.height = a.height
+	case ViewExploreAuthors:
+		a.exploreAuthors = NewExploreAuthorsModel(a.state, a.styles)
+		a.exploreAuthors.width = a.width
+		a.exploreAuthors.height = a.height
 	}
 
 	return nil
