@@ -215,7 +215,7 @@ func (sm *SearchModel) View() string {
 
 	// Title bar - centered with script name, version, and search dir
 	scriptName := GetAppName()
-	version := "2.4.5"
+	version := "2.4.6"
 	searchDir := sm.state.Config.SearchDir
 	topBar := fmt.Sprintf("  %s (version: %s) : %s  ", scriptName, version, searchDir)
 	// Center it
