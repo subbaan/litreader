@@ -495,6 +495,9 @@ func (a *App) navigateBack() tea.Cmd {
 		a.currentView = a.viewStack[len(a.viewStack)-1]
 		a.viewStack = a.viewStack[:len(a.viewStack)-1]
 	}
+	if a.currentView == ViewAuthorFiles && a.authorFiles != nil {
+		a.authorFiles.refreshFavorites()
+	}
 	return nil
 }
 

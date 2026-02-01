@@ -14,7 +14,7 @@ import (
 	"github.com/subbass/litreader/internal/ui"
 )
 
-const version = "2.4.6"
+const version = "2.4.9"
 
 func main() {
 	// Get the app name for display

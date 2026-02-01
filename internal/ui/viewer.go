@@ -9,8 +9,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/subbass/litreader/internal/external"
 	"github.com/subbass/litreader/internal/library"
@@ -46,7 +46,7 @@ type ViewerModel struct {
 	EditingBookmark bool // Exported for app navigation check
 
 	// Bookmark viewer
-	ViewingBookmarks bool              // Exported for app navigation check
+	ViewingBookmarks bool // Exported for app navigation check
 	fileBookmarks    []models.Bookmark
 	bookmarkCursor   int
 
@@ -228,17 +228,17 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// Remove from config
 					for i, bm := range vm.state.Config.Bookmarks {
 						if bm.Filename == deletedBookmark.Filename &&
-						   bm.Position == deletedBookmark.Position &&
-						   bm.DateAdded == deletedBookmark.DateAdded {
+							bm.Position == deletedBookmark.Position &&
+							bm.DateAdded == deletedBookmark.DateAdded {
 							vm.state.Config.Bookmarks = append(vm.state.Config.Bookmarks[:i],
-							                                   vm.state.Config.Bookmarks[i+1:]...)
+								vm.state.Config.Bookmarks[i+1:]...)
 							vm.state.Config.Save()
 							break
 						}
 					}
 					// Remove from local list
 					vm.fileBookmarks = append(vm.fileBookmarks[:vm.bookmarkCursor],
-					                          vm.fileBookmarks[vm.bookmarkCursor+1:]...)
+						vm.fileBookmarks[vm.bookmarkCursor+1:]...)
 					if vm.bookmarkCursor >= len(vm.fileBookmarks) && len(vm.fileBookmarks) > 0 {
 						vm.bookmarkCursor = len(vm.fileBookmarks) - 1
 					}
@@ -462,9 +462,9 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "e":
 			vm.editInEditor()
 
-		// TODO: Implement other features
-		// case "/": // Search within file
-		// case "e": // Export file
+			// TODO: Implement other features
+			// case "/": // Search within file
+			// case "e": // Export file
 		}
 	}
 
@@ -572,9 +572,6 @@ func (vm *ViewerModel) View() string {
 	}
 	centeredSecond := strings.Repeat(" ", padding2) + secondBar + strings.Repeat(" ", rightPadding2)
 	b.WriteString(vm.styles.Title.Render(centeredSecond))
-	b.WriteString("\n")
-
-	// One-line gap
 	b.WriteString("\n")
 
 	// Content (with error recovery for problematic lines)
@@ -822,8 +819,8 @@ func (vm *ViewerModel) renderBookmarkOverlay(baseView string) string {
 }
 
 func (vm *ViewerModel) getAvailableLines() int {
-	// Height minus title(1), second bar(1), gap(1), footer(2)
-	return vm.height - 5
+	// Height minus title(1), second bar(1), footer(2)
+	return vm.height - 4
 }
 
 func (vm *ViewerModel) jumpToPercentage(pct int) {
@@ -931,9 +928,9 @@ func (vm *ViewerModel) addToFavorites() {
 	}
 
 	vm.state.Config.Favorites = append(vm.state.Config.Favorites, newFav)
+	vm.state.FavoritesVersion++
 	vm.state.Config.Save()
 }
-
 
 func (vm *ViewerModel) viewFileBookmarks() {
 	// Find all bookmarks for current file

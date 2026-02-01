@@ -101,6 +101,7 @@ func (fm *FavoritesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Remove from list
 				fm.favorites = append(fm.favorites[:fm.cursor], fm.favorites[fm.cursor+1:]...)
 				fm.state.Config.Favorites = fm.favorites
+				fm.state.FavoritesVersion++
 				fm.state.Config.Save()
 
 				// Adjust cursor
