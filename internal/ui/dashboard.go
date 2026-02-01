@@ -10,6 +10,7 @@ import (
 	"github.com/subbass/litreader/internal/library"
 	"github.com/subbass/litreader/internal/models"
 	"github.com/subbass/litreader/internal/state"
+	"github.com/subbass/litreader/internal/version"
 )
 
 // InProgressItem represents a story in progress
@@ -232,7 +233,7 @@ func (dm *DashboardModel) View() string {
 	var b strings.Builder
 
 	// Title bar
-	title := GetAppName() + " v2.4.9 - Dashboard"
+	title := GetAppName() + " v" + version.AppVersion + " - Dashboard"
 	b.WriteString(dm.styles.RenderTitle(title, dm.width))
 	b.WriteString("\n\n")
 

@@ -12,9 +12,8 @@ import (
 	"github.com/subbass/litreader/internal/config"
 	"github.com/subbass/litreader/internal/state"
 	"github.com/subbass/litreader/internal/ui"
+	"github.com/subbass/litreader/internal/version"
 )
-
-const version = "2.4.9"
 
 func main() {
 	// Get the app name for display
@@ -31,7 +30,7 @@ func main() {
 
 	// Handle version flag
 	if *showVersion || *showVersionLong {
-		fmt.Printf("%s version %s\n", appName, version)
+		fmt.Printf("%s version %s\n", appName, version.AppVersion)
 		fmt.Println("A terminal-based text file reader and library manager")
 		fmt.Println("\nConfig location: ~/.config/" + appName + "/" + appName + ".conf")
 		fmt.Println("Cache location:  ~/.cache/" + appName + "/")
