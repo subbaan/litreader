@@ -33,10 +33,10 @@ type DashboardModel struct {
 	topRow     int
 
 	// Statistics
-	totalFiles   int
-	totalSizeMB  float64
-	avgRating    float64
-	ratedCount   int
+	totalFiles  int
+	totalSizeMB float64
+	avgRating   float64
+	ratedCount  int
 }
 
 // NewDashboardModel creates a new dashboard model
@@ -232,7 +232,7 @@ func (dm *DashboardModel) View() string {
 	var b strings.Builder
 
 	// Title bar
-	title := GetAppName() + " v2.4.7 - Dashboard"
+	title := GetAppName() + " v2.4.9 - Dashboard"
 	b.WriteString(dm.styles.RenderTitle(title, dm.width))
 	b.WriteString("\n\n")
 
