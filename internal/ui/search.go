@@ -9,12 +9,13 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/subbass/litreader/internal/cache"
 	"github.com/subbass/litreader/internal/external"
 	"github.com/subbass/litreader/internal/library"
 	"github.com/subbass/litreader/internal/state"
+	"github.com/subbass/litreader/internal/version"
 )
 
 // SearchModel represents the search view
@@ -51,10 +52,10 @@ func NewSearchModel(s *state.State, styles *Styles, initialQuery string) *Search
 	ti.Focus() // Auto-focus so user can start typing immediately
 
 	sm := &SearchModel{
-		state:     s,
-		styles:    styles,
-		textInput: ti,
-		query:     initialQuery,
+		state:      s,
+		styles:     styles,
+		textInput:  ti,
+		query:      initialQuery,
 		results:    []cache.SearchResult{},
 		cursor:     0,
 		topRow:     0,
@@ -72,9 +73,9 @@ type tickMsg time.Time
 
 // searchCompleteMsg is sent when search completes
 type searchCompleteMsg struct {
-	results    []cache.SearchResult
-	fromCache  bool
-	err        error
+	results   []cache.SearchResult
+	fromCache bool
+	err       error
 }
 
 // Init initializes the search view
@@ -215,7 +216,7 @@ func (sm *SearchModel) View() string {
 
 	// Title bar - centered with script name, version, and search dir
 	scriptName := GetAppName()
-	version := "2.4.9"
+	version := version.AppVersion
 	searchDir := sm.state.Config.SearchDir
 	topBar := fmt.Sprintf("  %s (version: %s) : %s  ", scriptName, version, searchDir)
 	// Center it
@@ -411,7 +412,7 @@ func (sm *SearchModel) renderPlasmaEffect(frame, width int) []string {
 
 			v1 := math.Sin(xf + t)
 			v2 := math.Sin(yf + t*1.3)
-			v3 := math.Sin((xf+yf) + t*0.7)
+			v3 := math.Sin((xf + yf) + t*0.7)
 			v4 := math.Sin(math.Sqrt(xf*xf+yf*yf) + t)
 
 			value := (v1 + v2 + v3 + v4) / 4.0
