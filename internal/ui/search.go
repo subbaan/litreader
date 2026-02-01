@@ -215,7 +215,7 @@ func (sm *SearchModel) View() string {
 
 	// Title bar - centered with script name, version, and search dir
 	scriptName := GetAppName()
-	version := "2.4.6"
+	version := "2.4.9"
 	searchDir := sm.state.Config.SearchDir
 	topBar := fmt.Sprintf("  %s (version: %s) : %s  ", scriptName, version, searchDir)
 	// Center it
@@ -223,7 +223,11 @@ func (sm *SearchModel) View() string {
 	if padding < 0 {
 		padding = 0
 	}
-	centeredTop := strings.Repeat(" ", padding) + topBar + strings.Repeat(" ", sm.width-padding-len(topBar))
+	rightPad := sm.width - padding - len(topBar)
+	if rightPad < 0 {
+		rightPad = 0
+	}
+	centeredTop := strings.Repeat(" ", padding) + topBar + strings.Repeat(" ", rightPad)
 	if len(centeredTop) > sm.width {
 		centeredTop = centeredTop[:sm.width]
 	}

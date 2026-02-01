@@ -232,7 +232,7 @@ func (dm *DashboardModel) View() string {
 	var b strings.Builder
 
 	// Title bar
-	title := GetAppName() + " v2.4.6 - Dashboard"
+	title := GetAppName() + " v2.4.7 - Dashboard"
 	b.WriteString(dm.styles.RenderTitle(title, dm.width))
 	b.WriteString("\n\n")
 

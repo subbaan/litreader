@@ -23,6 +23,8 @@ type AuthorFilesModel struct {
 	authorName   string
 	authorFolder string
 	files        []string
+	favoriteSet  map[string]bool
+	favoritesVer int
 	cursor       int
 	topRow       int
 	sortMode     int // 0=name, 1=size asc, 2=size desc
@@ -35,10 +37,14 @@ func NewAuthorFilesModel(s *state.State, styles *Styles, authorFolder string) *A
 		styles:       styles,
 		authorFolder: authorFolder,
 		authorName:   filepath.Base(authorFolder),
+		favoriteSet:  make(map[string]bool),
+		favoritesVer: -1,
 		cursor:       0,
 		topRow:       0,
 		sortMode:     0,
 	}
+
+	afm.refreshFavorites()
 
 	// Find all files in this author's folder
 	afm.findAuthorFiles()
@@ -69,6 +75,8 @@ func (afm *AuthorFilesModel) Init() tea.Cmd {
 
 // Update handles messages for the author files view
 func (afm *AuthorFilesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	afm.refreshFavorites()
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -196,9 +204,13 @@ func (afm *AuthorFilesModel) View() string {
 				ratingStr = fmt.Sprintf("%.2f", rating)
 			}
 
-			// Format: size | rating | filename (matching Python version)
+			// Format: favorite | size | rating | filename
 			filename := filepath.Base(file)
-			line := fmt.Sprintf("  %10.2f KB | %4s | %s", fileSize, ratingStr, filename)
+			heart := " "
+			if afm.favoriteSet[file] {
+				heart = "\uf004"
+			}
+			line := fmt.Sprintf("  %s %10.2f KB | %4s | %s", heart, fileSize, ratingStr, filename)
 
 			// Truncate if too long
 			if len(line) > afm.width-1 {
@@ -263,6 +275,17 @@ func (afm *AuthorFilesModel) getFileSize(path string) (int64, error) {
 		return 0, err
 	}
 	return info.Size(), nil
+}
+
+func (afm *AuthorFilesModel) refreshFavorites() {
+	if afm.favoritesVer == afm.state.FavoritesVersion && afm.favoriteSet != nil {
+		return
+	}
+	afm.favoriteSet = make(map[string]bool)
+	for _, fav := range afm.state.Config.Favorites {
+		afm.favoriteSet[fav.Filename] = true
+	}
+	afm.favoritesVer = afm.state.FavoritesVersion
 }
 
 // Ensure AuthorFilesModel implements tea.Model

@@ -22,6 +22,9 @@ type State struct {
 	// Search state
 	LastSearchQuery   string
 	LastSearchResults []cache.SearchResult
+
+	// Increment when favorites list changes (add/remove)
+	FavoritesVersion int
 }
 
 // NewState creates a new application state
