@@ -325,9 +325,12 @@ func (a *App) updateCurrentView(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// After view handles it, check if we should navigate
-	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		if navCmd := a.handleNavigation(keyMsg); navCmd != nil {
-			return a, navCmd
+	// Skip navigation handling when in editor mode - editor consumes all keys
+	if a.currentView != ViewEditor {
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			if navCmd := a.handleNavigation(keyMsg); navCmd != nil {
+				return a, navCmd
+			}
 		}
 	}
 
