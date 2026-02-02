@@ -77,8 +77,6 @@ func Load() (*Config, error) {
 			config.SearchDir = expandHome(value)
 		case "EXPORT_DIR":
 			config.ExportDir = expandHome(value)
-		case "editor":
-			config.Editor = value
 		case "ui_color":
 			config.UIColor = value
 		case "selector_color":

@@ -18,7 +18,6 @@ func main() {
 	fmt.Println("\n=== Config Loaded Successfully ===")
 	fmt.Printf("Search Dir: %s\n", cfg.SearchDir)
 	fmt.Printf("Export Dir: %s\n", cfg.ExportDir)
-	fmt.Printf("Editor: %s\n", cfg.Editor)
 	fmt.Printf("UI Color: %s\n", cfg.UIColor)
 	fmt.Printf("Selector Color: %s\n", cfg.SelectorColor)
 	fmt.Printf("Last File: %s\n", cfg.LastFile)

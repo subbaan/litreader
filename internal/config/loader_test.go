@@ -62,7 +62,6 @@ func TestLoadConfigWithFavorites(t *testing.T) {
 
 	configContent := `SEARCH_DIR=/home/user/docs
 EXPORT_DIR=/home/user/exports
-editor=nano
 ui_color=blue
 selector_color=yellow
 selector_reverse=true
@@ -188,7 +187,6 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	cfg := &Config{
 		SearchDir:       "/test/search",
 		ExportDir:       "/test/export",
-		Editor:          "vim",
 		UIColor:         "green",
 		SelectorColor:   "red",
 		SelectorReverse: true,

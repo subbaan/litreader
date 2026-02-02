@@ -12,7 +12,6 @@ const (
 type Config struct {
 	SearchDir            string
 	ExportDir            string
-	Editor               string
 	UIColor              string
 	SelectorColor        string
 	SelectorReverse      bool
@@ -35,7 +34,6 @@ func NewDefaultConfig() *Config {
 	return &Config{
 		SearchDir:            expandHome("~/Documents/"),
 		ExportDir:            expandHome("~/Documents/litreader_faves"),
-		Editor:               "nano",
 		UIColor:              "blue",
 		SelectorColor:        "yellow",
 		SelectorReverse:      true,
