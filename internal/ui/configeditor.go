@@ -72,7 +72,6 @@ func (cem *ConfigEditorModel) buildConfigItems() {
 	cem.items = []ConfigItem{
 		{Key: "SearchDir", DisplayName: "Search Directory", Value: c.SearchDir, Type: "string"},
 		{Key: "ExportDir", DisplayName: "Export Directory", Value: c.ExportDir, Type: "string"},
-		{Key: "Editor", DisplayName: "Editor", Value: c.Editor, Type: "string"},
 		{Key: "UIColor", DisplayName: "UI Color", Value: c.UIColor, Type: "color"},
 		{Key: "SelectorColor", DisplayName: "Selector Color", Value: c.SelectorColor, Type: "color"},
 		{Key: "SelectorReverse", DisplayName: "Selector Reverse", Value: fmt.Sprintf("%t", c.SelectorReverse), Type: "bool"},
@@ -388,8 +387,6 @@ func (cem *ConfigEditorModel) applyConfigChange(itemIdx int, newValue string) bo
 		c.SearchDir = item.Value
 	case "ExportDir":
 		c.ExportDir = item.Value
-	case "Editor":
-		c.Editor = item.Value
 	case "UIColor":
 		c.UIColor = item.Value
 	case "SelectorColor":

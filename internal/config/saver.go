@@ -21,7 +21,6 @@ func (c *Config) Save() error {
 	// Write simple config fields
 	fmt.Fprintf(file, "SEARCH_DIR=%s\n", c.SearchDir)
 	fmt.Fprintf(file, "EXPORT_DIR=%s\n", c.ExportDir)
-	fmt.Fprintf(file, "editor=%s\n", c.Editor)
 	fmt.Fprintf(file, "ui_color=%s\n", c.UIColor)
 	fmt.Fprintf(file, "selector_color=%s\n", c.SelectorColor)
 	fmt.Fprintf(file, "selector_reverse=%s\n", formatBool(c.SelectorReverse))
