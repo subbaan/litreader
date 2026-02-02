@@ -20,6 +20,7 @@ const (
 	ViewAuthorFiles
 	ViewConfigEditor
 	ViewExploreAuthors
+	ViewEditor
 )
 
 // App is the main bubbletea model
@@ -46,6 +47,7 @@ type App struct {
 	authorFiles    *AuthorFilesModel
 	configEditor   *ConfigEditorModel
 	exploreAuthors *ExploreAuthorsModel
+	editor         *EditorModel
 
 	// Modal/popup state
 	showPopup bool
@@ -132,10 +134,38 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.exploreAuthors.width = msg.Width
 			a.exploreAuthors.height = msg.Height
 		}
+		if a.editor != nil {
+			a.editor.width = msg.Width
+			a.editor.height = msg.Height
+		}
 		return a, nil
 
 	case errMsg:
 		a.err = msg.err
+		return a, nil
+
+	case openEditorMsg:
+		// Open built-in editor
+		a.editor = NewEditorModel(a.state, a.styles, msg.filename, msg.startLine)
+		a.editor.width = a.width
+		a.editor.height = a.height
+		a.viewStack = append(a.viewStack, a.currentView)
+		a.currentView = ViewEditor
+		return a, nil
+
+	case editorDoneMsg:
+		// Editor closed - return to previous view
+		if len(a.viewStack) > 0 {
+			a.currentView = a.viewStack[len(a.viewStack)-1]
+			a.viewStack = a.viewStack[:len(a.viewStack)-1]
+		} else {
+			a.currentView = ViewFile
+		}
+		// Reload the file in viewer if we were viewing it
+		if a.viewer != nil && a.currentView == ViewFile {
+			a.viewer.loadFile()
+		}
+		a.editor = nil
 		return a, nil
 
 	case openFileMsg:
@@ -284,6 +314,14 @@ func (a *App) updateCurrentView(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.exploreAuthors = updated
 			}
 		}
+	case ViewEditor:
+		if a.editor != nil {
+			var m tea.Model
+			m, cmd = a.editor.Update(msg)
+			if updated, ok := m.(*EditorModel); ok {
+				a.editor = updated
+			}
+		}
 	}
 
 	// After view handles it, check if we should navigate
@@ -347,6 +385,10 @@ func (a *App) View() string {
 	case ViewExploreAuthors:
 		if a.exploreAuthors != nil {
 			return a.exploreAuthors.View()
+		}
+	case ViewEditor:
+		if a.editor != nil {
+			return a.editor.View()
 		}
 	}
 
@@ -527,6 +569,11 @@ type filesScannedWithMetadataMsg struct {
 
 type stylesUpdatedMsg struct {
 	// Empty struct - just a signal to rebuild styles
+}
+
+type openEditorMsg struct {
+	filename  string
+	startLine int
 }
 
 // Commands

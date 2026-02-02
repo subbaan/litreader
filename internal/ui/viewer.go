@@ -3,7 +3,6 @@ package ui
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -27,9 +26,10 @@ type ViewerModel struct {
 	height int
 
 	// File content
-	filename   string
-	lines      []string
-	totalLines int
+	filename          string
+	lines             []string
+	totalLines        int
+	originalLineCount int // Line count of original file (before pandoc rendering)
 
 	// Viewing state
 	topRow int // Top line currently displayed
@@ -107,6 +107,9 @@ func (vm *ViewerModel) loadFile() {
 	// Try to convert to valid UTF-8 string with encoding detection
 	content := vm.decodeContent(data)
 
+	// Store original line count before pandoc rendering
+	vm.originalLineCount = strings.Count(content, "\n") + 1
+
 	// Render through pandoc if available (with panic recovery)
 	func() {
 		defer func() {
@@ -161,28 +164,30 @@ func (vm *ViewerModel) sanitizeLineForDisplay(line string) string {
 	return line
 }
 
-// truncateToWidth safely truncates a string to a maximum width in bytes
+// truncateToWidth safely truncates a string to a maximum display width
 func truncateToWidth(s string, maxWidth int) string {
 	if maxWidth <= 0 {
 		return ""
 	}
 
-	if len(s) <= maxWidth {
+	if lipgloss.Width(s) <= maxWidth {
 		return s
 	}
 
-	// Truncate at byte boundary, ensuring we don't cut a multibyte character
-	truncated := s[:maxWidth]
+	// Truncate by runes, checking display width as we go
+	var result strings.Builder
+	currentWidth := 0
 
-	// Walk back to find a valid UTF-8 boundary
-	for i := 0; i < 4 && len(truncated) > 0; i++ {
-		if utf8.ValidString(truncated) {
-			return truncated
+	for _, r := range s {
+		runeWidth := lipgloss.Width(string(r))
+		if currentWidth+runeWidth > maxWidth {
+			break
 		}
-		truncated = truncated[:len(truncated)-1]
+		result.WriteRune(r)
+		currentWidth += runeWidth
 	}
 
-	return truncated
+	return result.String()
 }
 
 // Init initializes the viewer
@@ -460,11 +465,24 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Edit in external editor
 		case "e":
-			vm.editInEditor()
+			// Open built-in editor at estimated original line
+			lineNum := 1
+			if vm.totalLines > 0 && vm.originalLineCount > 0 {
+				percentage := float64(vm.topRow) / float64(vm.totalLines)
+				lineNum = int(percentage*float64(vm.originalLineCount)) + 1
+				if lineNum < 1 {
+					lineNum = 1
+				}
+				if lineNum > vm.originalLineCount {
+					lineNum = vm.originalLineCount
+				}
+			}
+			return vm, func() tea.Msg {
+				return openEditorMsg{filename: vm.filename, startLine: lineNum}
+			}
 
 			// TODO: Implement other features
 			// case "/": // Search within file
-			// case "e": // Export file
 		}
 	}
 
@@ -593,9 +611,8 @@ func (vm *ViewerModel) View() string {
 			line = vm.highlightSearch(line)
 		}
 
-		// Truncate if too long (using byte length as fallback)
-		if len(line) > vm.width {
-			// Try to truncate at a safe boundary
+		// Truncate if too long (using display width)
+		if lipgloss.Width(line) > vm.width {
 			if vm.width > 0 {
 				line = truncateToWidth(line, vm.width)
 			}
@@ -996,37 +1013,6 @@ func (vm *ViewerModel) exportFile() {
 		return
 	}
 	os.WriteFile(exportPath, input, 0644)
-}
-
-func (vm *ViewerModel) editInEditor() {
-	// Get editor from config
-	editor := vm.state.Config.Editor
-	if editor == "" {
-		editor = "nano"
-	}
-
-	// Calculate line number (topRow + 1 for 1-indexed)
-	lineNum := vm.topRow + 1
-
-	// Exit bubbletea temporarily
-	// This is handled by sending a special message
-	// For now, we'll just call the editor directly
-	var cmd *exec.Cmd
-	if editor == "nano" {
-		cmd = exec.Command(editor, fmt.Sprintf("+%d", lineNum), vm.filename)
-	} else {
-		cmd = exec.Command(editor, vm.filename)
-	}
-
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	// Run editor
-	cmd.Run()
-
-	// Reload file after editing
-	vm.loadFile()
 }
 
 // Ensure ViewerModel implements tea.Model
