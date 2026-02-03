@@ -1,12 +1,17 @@
 package external
 
 import (
+	"bufio"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/subbass/litreader/internal/cache"
 )
+
+// MaxSearchFiles is the maximum number of files to return from a search
+// to prevent memory exhaustion on very broad searches
+const MaxSearchFiles = 50000
 
 // SearchFiles searches for a pattern in files using ripgrep
 func SearchFiles(pattern, searchDir string, fileList []string) ([]cache.SearchResult, error) {
@@ -30,20 +35,27 @@ func SearchFiles(pattern, searchDir string, fileList []string) ([]cache.SearchRe
 		searchDir,
 	)
 
-	output, err := cmd.Output()
+	// Stream output instead of loading all into memory
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		// Exit code 1 means no matches found
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
-			return []cache.SearchResult{}, nil
-		}
 		return nil, err
 	}
 
-	// Parse output and count matches per file
-	matchCounts := make(map[string]int)
-	lines := strings.Split(string(output), "\n")
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
 
-	for _, line := range lines {
+	// Parse output and count matches per file, with early termination
+	matchCounts := make(map[string]int)
+	scanner := bufio.NewScanner(stdout)
+
+	// Increase scanner buffer for long lines
+	const maxScanTokenSize = 1024 * 1024 // 1MB
+	buf := make([]byte, maxScanTokenSize)
+	scanner.Buffer(buf, maxScanTokenSize)
+
+	for scanner.Scan() {
+		line := scanner.Text()
 		if line == "" {
 			continue
 		}
@@ -55,7 +67,6 @@ func SearchFiles(pattern, searchDir string, fileList []string) ([]cache.SearchRe
 		}
 
 		// Convert the path from ripgrep to absolute
-		// If it's already absolute, use it; otherwise join with searchDir
 		filePath := parts[0]
 		if !filepath.IsAbs(filePath) {
 			filePath = filepath.Join(searchDir, filePath)
@@ -66,9 +77,18 @@ func SearchFiles(pattern, searchDir string, fileList []string) ([]cache.SearchRe
 
 		// Only count if file is in our list
 		if fileSet[filePath] {
+			// Check if this is a new file and we've hit the limit
+			if matchCounts[filePath] == 0 && len(matchCounts) >= MaxSearchFiles {
+				// We've hit the file limit, stop processing
+				break
+			}
 			matchCounts[filePath]++
 		}
 	}
+
+	// Kill ripgrep if still running (we may have stopped early)
+	cmd.Process.Kill()
+	cmd.Wait()
 
 	// Convert to results
 	results := make([]cache.SearchResult, 0, len(matchCounts))

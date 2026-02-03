@@ -41,6 +41,7 @@ type SearchModel struct {
 	fromCache  bool // Whether results came from cache
 	cacheError bool // Whether cache load failed
 	animFrame  int  // Animation frame counter
+	truncated  bool // Whether results were truncated due to limit
 }
 
 // NewSearchModel creates a new search view
@@ -111,8 +112,11 @@ func (sm *SearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			sm.results = []cache.SearchResult{}
 			sm.cacheError = true
+			sm.truncated = false
 		} else {
 			sm.results = msg.results
+			// Check if results were truncated at the search level
+			sm.truncated = len(msg.results) >= external.MaxSearchFiles
 			sm.fromCache = msg.fromCache
 			sm.sortResults()
 		}
@@ -255,7 +259,11 @@ func (sm *SearchModel) View() string {
 		}
 		resultPos := ""
 		if len(sm.results) > 0 {
-			resultPos = fmt.Sprintf(" | Result %d/%d", sm.cursor+1, len(sm.results))
+			if sm.truncated {
+				resultPos = fmt.Sprintf(" | Result %d/%d (LIMIT REACHED)", sm.cursor+1, len(sm.results))
+			} else {
+				resultPos = fmt.Sprintf(" | Result %d/%d", sm.cursor+1, len(sm.results))
+			}
 		}
 		// Build the status bar with styled cache indicator
 		leftPart := fmt.Sprintf("Search: %s | Sort by: %s%s", sm.query, sortText, resultPos)
