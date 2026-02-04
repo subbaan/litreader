@@ -1,164 +1,111 @@
 # litreader
 
-A terminal-based text file reader and library manager for text stories, rewritten in Go using the Bubbletea framework.
+A terminal-based ebook reader and library manager for your text story collection.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-%3E%3D%201.24-blue.svg)](https://golang.org/)
 
-## Project Status
+![Dashboard](images/mainmenu.png)
 
-**Phase 1: Foundation - ✅ COMPLETE**
+## Features
 
-- ✅ Project structure created
-- ✅ Go module initialized
-- ✅ XDG-compliant path helpers
-- ✅ Config management with Python compatibility
-- ✅ Cache system (JSON-based)
-- ✅ Model types (Favorite, Bookmark, FileInfo)
-- ✅ Unit tests passing
-- ✅ Verified compatibility with existing Python config
+**Organize Your Library**
+- Track reading progress across all your stories
+- Rate stories and see library-wide statistics
+- Save favorite stories and authors for quick access
 
-**Phase 2: Basic TUI - ✅ COMPLETE**
+**Comfortable Reading**
+- Clean, distraction-free terminal reader
+- Bookmark passages to return to later
+- Jump to any point in a story by percentage
+- Track where you left off automatically
 
-- ✅ Bubbletea application skeleton
-- ✅ State management and navigation stack
-- ✅ Dashboard view with library stats
-- ✅ Lipgloss styling (configurable colors from config)
-- ✅ Responsive layout and window resize handling
-- ✅ Menu navigation (arrow keys, vim keys)
+![Reading a story](images/story.png)
 
-**Phase 3: Core Views - ✅ COMPLETE**
+**Discover and Explore**
+- Fast full-text search across your entire library (powered by ripgrep)
+- Browse authors and see stats about their works
+- Filter and sort by rating, size, or name
 
-- ✅ Library file scanner
-- ✅ File viewer with pandoc rendering
-- ✅ Search view with ripgrep integration
-- ✅ Favorites view with sorting
-- ✅ Bookmarks view
-- ✅ Author favorites view
-- ✅ Full navigation between all views
-- ✅ Keyboard shortcut navigation (s, f, b, a, l, q)
+![Explore authors](images/explore_view.png)
 
-**Phase 4: Advanced Features - ✅ COMPLETE**
+**Customizable**
+- Configurable color schemes
+- Keyboard-driven interface with vim-style navigation
+- Built-in configuration editor
 
-- ✅ Add to favorites from viewer ('f' key)
-- ✅ Add bookmark from viewer ('b' key)
-- ✅ Configuration editor ('c' key from dashboard)
-- ✅ All views styled to match original Python version
-- ✅ Author files browser (press Enter on an author to view their files)
-- ✅ File scanning on startup (enables search functionality)
+![Configuration](images/config.png)
+
+## Screenshots
+
+| Favorite Stories | Favorite Authors | Bookmarks |
+|------------------|------------------|-----------|
+| ![Favorites](images/fave_stories.png) | ![Authors](images/fave_authors.png) | ![Bookmarks](images/bookmark.png) |
 
 ## Installation
 
-### Prerequisites
+### Requirements
 
-#### Required
-- **Go 1.24 or later** - [Download Go](https://golang.org/dl/)
-- **txt files** - A number of .txt files inside Authorname/ folders.
+- **Go 1.24+** - [Download Go](https://golang.org/dl/)
+- A collection of `.txt` files organized in author folders
 
-#### Optional (gracefully handled if missing)
-- **pandoc** - For rendering markdown files (falls back to plain text if unavailable)
-- **ripgrep (rg)** - For fast file searching (search functionality disabled if unavailable)
+Optional:
+- **pandoc** - For markdown rendering (falls back to plain text)
+- **ripgrep** - For fast search (search disabled without it)
 
-### From Source
+### Build from Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/subbass/litreader.git
 cd litreader
-
-# Build the application
 go build -o litreader ./cmd/litreader
 
-# Install to your system (optional)
+# Optional: install system-wide
 sudo mv litreader /usr/local/bin/
-# Or add to your PATH
 ```
 
-### First Run
+## Quick Start
 
-On first run, litreader will automatically create:
-- Config directory: `~/.config/litreader/`
-- Config file: `~/.config/litreader/litreader.conf`
-- Cache directory: `~/.cache/litreader/`
+1. Run `litreader` - config files are created automatically
+2. Press `c` to open the configuration editor
+3. Set your `Search Directory` to your story library folder
+4. Press `q` to save and restart litreader
+5. Run `litreader -u` to scan your library
 
-You'll need to edit the config file to set your library directory. See the [Configuration](#configuration) section below.
+## Keyboard Shortcuts
 
-## Building
+**Dashboard**
+| Key | Action |
+|-----|--------|
+| `s` | Search library |
+| `f` | View favorites |
+| `b` | View bookmarks |
+| `a` | View favorite authors |
+| `e` | Explore all authors |
+| `c` | Configuration |
+| `l` | Open last read story |
+| `q` | Quit |
 
-```bash
-go build -o litreader ./cmd/litreader
-```
-
-## Testing
-
-```bash
-# Run all tests
-go test ./...
-
-# Run specific package tests
-go test ./internal/config/... -v
-```
-
-## Project Structure
-
-```
-litreader-go/
-├── cmd/
-│   ├── litreader/          # Main application
-│   └── test-config/        # Config testing tool
-├── internal/
-│   ├── config/             # Configuration management
-│   ├── cache/              # File and search caching
-│   ├── models/             # Data models
-│   ├── external/           # External command wrappers (TODO)
-│   ├── library/            # File scanning and stats (TODO)
-│   ├── state/              # Application state (TODO)
-│   └── ui/                 # Bubbletea UI components (TODO)
-└── go.mod
-```
-
-## Configuration
-
-The configuration file is located at `~/.config/litreader/litreader.conf` and uses a simple key-value format.
-
-### Configuration Options
-
-```ini
-# Library paths
-search_dir = /path/to/your/story/library
-export_dir = ~/Documents/litreader_faves
-
-# UI Colors
-ui_color = blue
-selector_color = yellow
-selector_reverse = true
-selector_bold = true
-selector_reverse_color = black
-content_color = white
-content_bold = false
-
-# Cache settings
-cache_expiry_days = 7
-
-# Editor (for config editing from within app)
-editor = nano
-```
-
-### Usage
-- Press 'c' from the dashboard to edit the configuration file
-- Changes take effect after restarting the application
-- 'litreader -u' to scan the library
-- Use search to start with, add authors, add faves.
-- Use bookamrks to save favorite passages.
-- Explore an Authors files on disk, press a for fave authors and b to browse.
-
+**Reader**
+| Key | Action |
+|-----|--------|
+| `↑/↓` or `j/k` | Scroll |
+| `Space/@` | Page down/up |
+| `0-9` | Jump to percentage |
+| `f` | Add to favorites |
+| `a` | Add author to favorites |
+| `b` | Add bookmark |
+| `v` | View bookmarks |
+| `e` | Edit in external editor |
+| `o` | Browse author's files |
+| `q` or `←` | Back |
 
 ## Version
 
-Current: 2.4.5 (Go rewrite)
+Current: v2.5.5
 
-### Changelog
-- 2.4.5: Repository prepared for public release (MIT license, documentation updates)
-- 2.2.0: Fixed file crash issues (encoding, pandoc timeout, rendering safeguards)
-- 2.1.0: Dynamic app name support + library display
-- 2.0.0: Initial Go rewrite from Python version 1.78.0
+See [DEVELOPMENT.md](DEVELOPMENT.md) for technical documentation and changelog.
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
