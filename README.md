@@ -96,13 +96,13 @@ sudo mv litreader /usr/local/bin/
 | `a` | Add author to favorites |
 | `b` | Add bookmark |
 | `v` | View bookmarks |
-| `e` | Edit in external editor |
+| `e` | Edit in built-in editor |
 | `o` | Browse author's files |
 | `q` or `←` | Back |
 
 ## Version
 
-Current: v2.5.5
+Current: v2.5.6
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for technical documentation and changelog.
 
