@@ -34,6 +34,7 @@ type ViewerModel struct {
 	// Viewing state
 	topRow                 int  // Top line currently displayed
 	wordWrap               bool // Word-wrap toggle (off by default)
+	wrapTopOffset          int  // Display rows of topRow hidden above viewport (for smooth wrap scrolling)
 	lastVisibleSourceLines int  // Source lines that fit on screen in last render (for wrapped paging)
 	footerLines            int  // Number of footer lines (2 or 3, computed during render)
 
@@ -223,6 +224,7 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Jump to selected bookmark
 				if len(vm.fileBookmarks) > 0 && vm.bookmarkCursor < len(vm.fileBookmarks) {
 					vm.topRow = vm.fileBookmarks[vm.bookmarkCursor].Position
+					vm.wrapTopOffset = 0
 					vm.ViewingBookmarks = false
 				}
 			case "esc", "q", "v", "left":
@@ -312,6 +314,7 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if len(vm.matches) > 0 {
 						vm.currentMatch = 0
 						vm.topRow = max(vm.matches[0]-2, 0)
+						vm.wrapTopOffset = 0
 					}
 				} else {
 					vm.matches = []int{}
@@ -336,16 +339,37 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// Navigation - scroll viewport directly
 		case "down", "j":
-			if vm.topRow < vm.totalLines-1 {
-				vm.topRow++
+			if vm.wordWrap {
+				wrapped := wrapLine(vm.prepareLineForDisplay(vm.topRow), vm.width)
+				if vm.wrapTopOffset < len(wrapped)-1 {
+					vm.wrapTopOffset++
+				} else if vm.topRow < vm.totalLines-1 {
+					vm.topRow++
+					vm.wrapTopOffset = 0
+				}
+			} else {
+				if vm.topRow < vm.totalLines-1 {
+					vm.topRow++
+				}
 			}
 
 		case "up", "k":
-			if vm.topRow > 0 {
-				vm.topRow--
+			if vm.wordWrap {
+				if vm.wrapTopOffset > 0 {
+					vm.wrapTopOffset--
+				} else if vm.topRow > 0 {
+					vm.topRow--
+					wrapped := wrapLine(vm.prepareLineForDisplay(vm.topRow), vm.width)
+					vm.wrapTopOffset = len(wrapped) - 1
+				}
+			} else {
+				if vm.topRow > 0 {
+					vm.topRow--
+				}
 			}
 
 		case "pgdown", " ":
+			vm.wrapTopOffset = 0
 			if vm.wordWrap && vm.lastVisibleSourceLines > 2 {
 				// When wrapping, advance by source lines that actually fit on screen
 				scrollAmount := max(vm.lastVisibleSourceLines-2, 1)
@@ -357,6 +381,7 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "pgup":
+			vm.wrapTopOffset = 0
 			if vm.wordWrap && vm.lastVisibleSourceLines > 2 {
 				scrollAmount := max(vm.lastVisibleSourceLines-2, 1)
 				vm.topRow = max(vm.topRow-scrollAmount, 0)
@@ -368,8 +393,10 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "home", "g":
 			vm.topRow = 0
+			vm.wrapTopOffset = 0
 
 		case "end", "G":
+			vm.wrapTopOffset = 0
 			availableLines := vm.getAvailableLines()
 			vm.topRow = max(0, vm.totalLines-availableLines)
 
@@ -413,6 +440,7 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Toggle word wrap
 		case "w":
 			vm.wordWrap = !vm.wordWrap
+			vm.wrapTopOffset = 0
 
 		// Export file
 		case "c":
@@ -445,6 +473,7 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if nextMatch != -1 {
 					vm.currentMatch = nextMatch
 					vm.topRow = max(vm.matches[vm.currentMatch]-2, 0)
+					vm.wrapTopOffset = 0
 				}
 			}
 
@@ -461,6 +490,7 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if prevMatch != -1 {
 					vm.currentMatch = prevMatch
 					vm.topRow = max(vm.matches[vm.currentMatch]-2, 0)
+					vm.wrapTopOffset = 0
 				}
 			} else {
 				// No search matches, use left arrow to go back
@@ -622,20 +652,22 @@ func (vm *ViewerModel) View() string {
 				break
 			}
 
-			line := vm.lines[i]
-			line = vm.sanitizeLineForDisplay(line)
-
-			if vm.searchText != "" {
-				line = vm.highlightSearch(line)
-			}
+			line := vm.prepareLineForDisplay(i)
 
 			wrapped := wrapLine(line, vm.width)
 			sourceLineCount++
 
-			for _, wl := range wrapped {
+			// For the first source line, skip rows hidden by wrapTopOffset
+			startIdx := 0
+			if i == vm.topRow {
+				startIdx = vm.wrapTopOffset
+			}
+
+			for j := startIdx; j < len(wrapped); j++ {
 				if displayRowsUsed >= availableLines {
 					break
 				}
+				wl := wrapped[j]
 				func() {
 					defer func() {
 						if r := recover(); r != nil {
@@ -1034,9 +1066,19 @@ func (vm *ViewerModel) getAvailableLines() int {
 	return vm.height - 2 - footer
 }
 
+// prepareLineForDisplay sanitizes and optionally highlights a source line for display
+func (vm *ViewerModel) prepareLineForDisplay(i int) string {
+	line := vm.sanitizeLineForDisplay(vm.lines[i])
+	if vm.searchText != "" {
+		line = vm.highlightSearch(line)
+	}
+	return line
+}
+
 func (vm *ViewerModel) jumpToPercentage(pct int) {
 	targetLine := (vm.totalLines * pct) / 100
 	vm.topRow = targetLine
+	vm.wrapTopOffset = 0
 }
 
 func (vm *ViewerModel) highlightSearch(line string) string {
