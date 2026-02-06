@@ -32,7 +32,10 @@ type ViewerModel struct {
 	originalLineCount int // Line count of original file (before pandoc rendering)
 
 	// Viewing state
-	topRow int // Top line currently displayed
+	topRow                 int  // Top line currently displayed
+	wordWrap               bool // Word-wrap toggle (off by default)
+	lastVisibleSourceLines int  // Source lines that fit on screen in last render (for wrapped paging)
+	footerLines            int  // Number of footer lines (2 or 3, computed during render)
 
 	// Search
 	searchText    string
@@ -343,14 +346,25 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "pgdown", " ":
-			// Leave 2 lines visible from previous page for context
-			scrollAmount := max(vm.getAvailableLines()-2, 1)
-			vm.topRow = min(vm.topRow+scrollAmount, vm.totalLines-1)
+			if vm.wordWrap && vm.lastVisibleSourceLines > 2 {
+				// When wrapping, advance by source lines that actually fit on screen
+				scrollAmount := max(vm.lastVisibleSourceLines-2, 1)
+				vm.topRow = min(vm.topRow+scrollAmount, vm.totalLines-1)
+			} else {
+				// Leave 2 lines visible from previous page for context
+				scrollAmount := max(vm.getAvailableLines()-2, 1)
+				vm.topRow = min(vm.topRow+scrollAmount, vm.totalLines-1)
+			}
 
 		case "pgup":
-			// Leave 2 lines visible from previous page for context
-			scrollAmount := max(vm.getAvailableLines()-2, 1)
-			vm.topRow = max(vm.topRow-scrollAmount, 0)
+			if vm.wordWrap && vm.lastVisibleSourceLines > 2 {
+				scrollAmount := max(vm.lastVisibleSourceLines-2, 1)
+				vm.topRow = max(vm.topRow-scrollAmount, 0)
+			} else {
+				// Leave 2 lines visible from previous page for context
+				scrollAmount := max(vm.getAvailableLines()-2, 1)
+				vm.topRow = max(vm.topRow-scrollAmount, 0)
+			}
 
 		case "home", "g":
 			vm.topRow = 0
@@ -395,6 +409,10 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			vm.bookmarkInput.Focus()
 			vm.EditingBookmark = true
 			return vm, textinput.Blink
+
+		// Toggle word wrap
+		case "w":
+			vm.wordWrap = !vm.wordWrap
 
 		// Export file
 		case "c":
@@ -594,87 +612,128 @@ func (vm *ViewerModel) View() string {
 
 	// Content (with error recovery for problematic lines)
 	availableLines := vm.getAvailableLines()
-	endRow := min(vm.topRow+availableLines, vm.totalLines)
+	displayRowsUsed := 0
+	sourceLineCount := 0
 
-	for i := vm.topRow; i < endRow; i++ {
-		if i >= len(vm.lines) {
-			break
-		}
+	if vm.wordWrap {
+		// Word-wrap mode: iterate source lines, wrapping each
+		for i := vm.topRow; i < vm.totalLines && displayRowsUsed < availableLines; i++ {
+			if i >= len(vm.lines) {
+				break
+			}
 
-		line := vm.lines[i]
+			line := vm.lines[i]
+			line = vm.sanitizeLineForDisplay(line)
 
-		// Clean the line for safe terminal rendering
-		line = vm.sanitizeLineForDisplay(line)
+			if vm.searchText != "" {
+				line = vm.highlightSearch(line)
+			}
 
-		// Highlight search text if present
-		if vm.searchText != "" {
-			line = vm.highlightSearch(line)
-		}
+			wrapped := wrapLine(line, vm.width)
+			sourceLineCount++
 
-		// Truncate if too long (using display width)
-		if lipgloss.Width(line) > vm.width {
-			if vm.width > 0 {
-				line = truncateToWidth(line, vm.width)
+			for _, wl := range wrapped {
+				if displayRowsUsed >= availableLines {
+					break
+				}
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							b.WriteString(wl)
+							b.WriteString("\n")
+						}
+					}()
+					b.WriteString(vm.styles.Content.Render(wl))
+					b.WriteString("\n")
+				}()
+				displayRowsUsed++
 			}
 		}
+		vm.lastVisibleSourceLines = sourceLineCount
+	} else {
+		// Normal mode: one source line per display row (truncated)
+		endRow := min(vm.topRow+availableLines, vm.totalLines)
 
-		// Render with panic recovery
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					// If rendering panics, write plain text
-					b.WriteString(line)
-					b.WriteString("\n")
+		for i := vm.topRow; i < endRow; i++ {
+			if i >= len(vm.lines) {
+				break
+			}
+
+			line := vm.lines[i]
+			line = vm.sanitizeLineForDisplay(line)
+
+			if vm.searchText != "" {
+				line = vm.highlightSearch(line)
+			}
+
+			if lipgloss.Width(line) > vm.width {
+				if vm.width > 0 {
+					line = truncateToWidth(line, vm.width)
 				}
+			}
+
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						b.WriteString(line)
+						b.WriteString("\n")
+					}
+				}()
+				b.WriteString(vm.styles.Content.Render(line))
+				b.WriteString("\n")
 			}()
-			b.WriteString(vm.styles.Content.Render(line))
-			b.WriteString("\n")
-		}()
+			displayRowsUsed++
+		}
+		vm.lastVisibleSourceLines = endRow - vm.topRow
 	}
 
 	// Pad remaining lines
-	for i := endRow - vm.topRow; i < availableLines; i++ {
+	for i := displayRowsUsed; i < availableLines; i++ {
 		b.WriteString("\n")
 	}
 
-	// Footer bar - two lines
-	// Line 1: Navigation and favorites
-	line1Text := "←/q:Back ↑↓/Space:Scroll ⌫:PgUp 0-9:%Jump f:Fav a:FavAuthor b:Bookmark"
-	line1Width := lipgloss.Width(line1Text)
-	if line1Width < vm.width {
-		line1Text = line1Text + strings.Repeat(" ", vm.width-line1Width)
-	} else if line1Width > vm.width {
-		line1Text = line1Text[:vm.width]
-	}
-
-	// Line 2: Actions and optional search info
-	line2Text := "e:Edit c:Export o:AuthorFiles v:ViewBookmarks"
-
-	// Add search input if editing (bookmark input now shows in overlay)
+	// Footer bar - reflowing help items across 2-3 lines based on width
+	// Build search suffix
+	var searchSuffix string
 	if vm.EditingSearch {
-		line2Text += " [" + vm.searchInput.View() + "]"
+		searchSuffix = "[" + vm.searchInput.View() + "]"
 	} else if vm.searchText != "" && len(vm.matches) > 0 {
-		line2Text += fmt.Sprintf(" [s:Search %s  (%d/%d) | ←→:Nav x:Clear]", vm.searchText, vm.currentMatch+1, len(vm.matches))
+		searchSuffix = fmt.Sprintf("[s:Search %s (%d/%d) | ←→:Nav x:Clear]", vm.searchText, vm.currentMatch+1, len(vm.matches))
 	} else if vm.searchText != "" {
-		line2Text += fmt.Sprintf(" [s:Search %s  (0/0) | x:Clear]", vm.searchText)
+		searchSuffix = fmt.Sprintf("[s:Search %s (0/0) | x:Clear]", vm.searchText)
 	} else {
-		line2Text += " [s:Search]"
+		searchSuffix = "[s:Search]"
 	}
 
-	// Pad line 2 to full width using proper width calculation
-	line2Width := lipgloss.Width(line2Text)
-	if line2Width < vm.width {
-		line2Text = line2Text + strings.Repeat(" ", vm.width-line2Width)
-	} else if line2Width > vm.width {
-		line2Text = line2Text[:vm.width]
+	wrapLabel := "w:Wrap"
+	if vm.wordWrap {
+		wrapLabel = "w:Wrap[ON]"
 	}
 
-	// Write both lines
-	b.WriteString(vm.styles.HelpBar.Render(line1Text))
-	b.WriteString("\n")
-	b.WriteString(vm.styles.HelpBar.Render(line2Text))
+	// All help items in display order
+	helpItems := []string{
+		"←/q:Back", "↑↓/Space:Scroll", "⌫:PgUp", "0-9:%Jump",
+		"f:Fav", "a:FavAuthor", "b:Bookmark",
+		"e:Edit", "c:Export", "o:AuthorFiles", "v:ViewBookmarks",
+		wrapLabel, searchSuffix,
+	}
 
-	result := b.String()
+	// Flow items into lines that fit within vm.width
+	footerRows := flowHelpItems(helpItems, vm.width)
+	vm.footerLines = len(footerRows)
+
+	for _, row := range footerRows {
+		rowWidth := lipgloss.Width(row)
+		if rowWidth < vm.width {
+			row = row + strings.Repeat(" ", vm.width-rowWidth)
+		} else if rowWidth > vm.width {
+			row = truncateToWidth(row, vm.width)
+		}
+		b.WriteString(vm.styles.HelpBar.Render(row))
+		b.WriteString("\n")
+	}
+	// Remove trailing newline from last footer line
+	result := strings.TrimRight(b.String(), "\n")
 
 	// Overlay bookmark input if editing
 	if vm.EditingBookmark {
@@ -835,9 +894,144 @@ func (vm *ViewerModel) renderBookmarkOverlay(baseView string) string {
 		lipgloss.WithWhitespaceForeground(lipgloss.Color("0")))
 }
 
+// wrapLine breaks a line into multiple display rows that fit within width.
+// It respects ANSI escape sequences (won't split inside them) and breaks at
+// word boundaries where possible, falling back to character-level breaks.
+func wrapLine(line string, width int) []string {
+	if width <= 0 || lipgloss.Width(line) <= width {
+		return []string{line}
+	}
+
+	var result []string
+	runes := []rune(line)
+	pos := 0
+
+	for pos < len(runes) {
+		// Find how many runes fit in this row
+		var rowBuilder strings.Builder
+		currentWidth := 0
+		rowStart := pos
+		lastSpace := -1 // position in runes of last space that fits
+
+		for pos < len(runes) {
+			r := runes[pos]
+
+			// Check for ANSI escape sequence: consume it without adding width
+			if r == '\x1b' && pos+1 < len(runes) && runes[pos+1] == '[' {
+				// Consume the entire escape sequence
+				escStart := pos
+				pos += 2 // skip \x1b[
+				for pos < len(runes) && !((runes[pos] >= 'A' && runes[pos] <= 'Z') || (runes[pos] >= 'a' && runes[pos] <= 'z')) {
+					pos++
+				}
+				if pos < len(runes) {
+					pos++ // skip the final letter
+				}
+				// Write the escape sequence (zero width)
+				for i := escStart; i < pos; i++ {
+					rowBuilder.WriteRune(runes[i])
+				}
+				continue
+			}
+
+			runeWidth := lipgloss.Width(string(r))
+			if currentWidth+runeWidth > width {
+				break
+			}
+			if r == ' ' {
+				lastSpace = pos
+			}
+			rowBuilder.WriteRune(r)
+			currentWidth += runeWidth
+			pos++
+		}
+
+		// If we haven't consumed all runes and there's a space to break at
+		if pos < len(runes) && lastSpace > rowStart {
+			// Rewind to break at word boundary
+			// Rebuild the row up to lastSpace+1 (include the space)
+			var wordBuilder strings.Builder
+			for i := rowStart; i <= lastSpace; i++ {
+				wordBuilder.WriteRune(runes[i])
+			}
+			// But we need to preserve any ANSI sequences that were between rowStart and lastSpace
+			// Simpler: just rebuild from runes
+			result = append(result, buildRuneSlice(runes, rowStart, lastSpace+1, width))
+			pos = lastSpace + 1
+		} else {
+			result = append(result, rowBuilder.String())
+		}
+	}
+
+	if len(result) == 0 {
+		return []string{""}
+	}
+	return result
+}
+
+// buildRuneSlice builds a string from a rune slice, consuming ANSI sequences properly.
+func buildRuneSlice(runes []rune, start, end, maxWidth int) string {
+	var b strings.Builder
+	for i := start; i < end && i < len(runes); i++ {
+		b.WriteRune(runes[i])
+	}
+	return b.String()
+}
+
+// flowHelpItems distributes help items across lines, fitting as many per line
+// as the width allows. Returns 2-3 lines. Items are separated by spaces.
+func flowHelpItems(items []string, width int) []string {
+	if width <= 0 {
+		return []string{strings.Join(items, " ")}
+	}
+
+	var lines []string
+	var current strings.Builder
+	currentWidth := 0
+
+	for _, item := range items {
+		itemWidth := lipgloss.Width(item)
+
+		if currentWidth == 0 {
+			// First item on this line
+			current.WriteString(item)
+			currentWidth = itemWidth
+		} else if currentWidth+1+itemWidth <= width {
+			// Fits on current line with a space separator
+			current.WriteString(" ")
+			current.WriteString(item)
+			currentWidth += 1 + itemWidth
+		} else {
+			// Start a new line
+			lines = append(lines, current.String())
+			current.Reset()
+			current.WriteString(item)
+			currentWidth = itemWidth
+		}
+	}
+	if current.Len() > 0 {
+		lines = append(lines, current.String())
+	}
+
+	// Cap at 3 lines — if overflow, merge remaining onto line 3
+	if len(lines) > 3 {
+		merged := strings.Join(lines[2:], " ")
+		lines = []string{lines[0], lines[1], merged}
+	}
+
+	if len(lines) == 0 {
+		return []string{""}
+	}
+	return lines
+}
+
 func (vm *ViewerModel) getAvailableLines() int {
-	// Height minus title(1), second bar(1), footer(2)
-	return vm.height - 4
+	// Height minus title(1), second bar(1), footer(2 or 3)
+	footer := vm.footerLines
+	if footer < 2 {
+		footer = 2 // minimum before first render computes it
+	}
+	return vm.height - 2 - footer
 }
 
 func (vm *ViewerModel) jumpToPercentage(pct int) {
@@ -863,7 +1057,7 @@ func (vm *ViewerModel) highlightSearch(line string) string {
 	match := line[idx : idx+len(vm.searchText)]
 	after := line[idx+len(vm.searchText):]
 
-	return before + vm.styles.Highlight.Render(match) + after
+	return before + vm.styles.Highlight.Render(match) + vm.styles.Content.Render(after)
 }
 
 func (vm *ViewerModel) findMatches() {
