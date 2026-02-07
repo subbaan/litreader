@@ -19,6 +19,7 @@ type Config struct {
 	SelectorReverseColor string
 	ContentColor         string
 	ContentBold          bool
+	ShowViewerHelpBar    bool
 	LastFile             string
 	Position             int
 	SearchText           string
@@ -41,6 +42,7 @@ func NewDefaultConfig() *Config {
 		SelectorReverseColor: "black",
 		ContentColor:         "white",
 		ContentBold:          false,
+		ShowViewerHelpBar:    true,
 		LastFile:             "",
 		Position:             0,
 		SearchText:           "",

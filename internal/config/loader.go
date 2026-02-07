@@ -91,6 +91,8 @@ func Load() (*Config, error) {
 			config.ContentColor = value
 		case "content_bold":
 			config.ContentBold = parseBool(value)
+		case "viewer_help_bar":
+			config.ShowViewerHelpBar = parseBool(value)
 		case "last_file":
 			config.LastFile = value
 		case "position":
