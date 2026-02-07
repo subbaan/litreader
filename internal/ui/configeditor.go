@@ -79,6 +79,7 @@ func (cem *ConfigEditorModel) buildConfigItems() {
 		{Key: "SelectorReverseColor", DisplayName: "Selector Reverse Color", Value: c.SelectorReverseColor, Type: "color"},
 		{Key: "ContentColor", DisplayName: "Content Color", Value: c.ContentColor, Type: "color"},
 		{Key: "ContentBold", DisplayName: "Content Bold", Value: fmt.Sprintf("%t", c.ContentBold), Type: "bool"},
+		{Key: "ShowViewerHelpBar", DisplayName: "Viewer Help Bar", Value: fmt.Sprintf("%t", c.ShowViewerHelpBar), Type: "bool"},
 		{Key: "CacheExpiryDays", DisplayName: "Cache Expiry (days)", Value: fmt.Sprintf("%d", c.CacheExpiryDays), Type: "int"},
 		{Key: "ClearSearchCache", DisplayName: "Clear Search Cache", Value: "Press Enter", Type: "action"},
 		{Key: "ClearFileListCache", DisplayName: "Clear File List Cache", Value: "Press Enter", Type: "action"},
@@ -401,6 +402,8 @@ func (cem *ConfigEditorModel) applyConfigChange(itemIdx int, newValue string) bo
 		c.ContentColor = item.Value
 	case "ContentBold":
 		c.ContentBold = item.Value == "true"
+	case "ShowViewerHelpBar":
+		c.ShowViewerHelpBar = item.Value == "true"
 	case "CacheExpiryDays":
 		val, _ := strconv.Atoi(item.Value)
 		c.CacheExpiryDays = val

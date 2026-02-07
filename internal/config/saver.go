@@ -28,6 +28,7 @@ func (c *Config) Save() error {
 	fmt.Fprintf(file, "selector_reverse_color=%s\n", c.SelectorReverseColor)
 	fmt.Fprintf(file, "content_color=%s\n", c.ContentColor)
 	fmt.Fprintf(file, "content_bold=%s\n", formatBool(c.ContentBold))
+	fmt.Fprintf(file, "viewer_help_bar=%s\n", formatBool(c.ShowViewerHelpBar))
 	fmt.Fprintf(file, "last_file=%s\n", c.LastFile)
 	fmt.Fprintf(file, "position=%d\n", c.Position)
 	fmt.Fprintf(file, "search_text=%s\n", c.SearchText)

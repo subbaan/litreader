@@ -724,45 +724,50 @@ func (vm *ViewerModel) View() string {
 		b.WriteString("\n")
 	}
 
-	// Footer bar - reflowing help items across 2-3 lines based on width
-	// Build search suffix
-	var searchSuffix string
-	if vm.EditingSearch {
-		searchSuffix = "[" + vm.searchInput.View() + "]"
-	} else if vm.searchText != "" && len(vm.matches) > 0 {
-		searchSuffix = fmt.Sprintf("[s:Search %s (%d/%d) | ←→:Nav x:Clear]", vm.searchText, vm.currentMatch+1, len(vm.matches))
-	} else if vm.searchText != "" {
-		searchSuffix = fmt.Sprintf("[s:Search %s (0/0) | x:Clear]", vm.searchText)
-	} else {
-		searchSuffix = "[s:Search]"
-	}
-
-	wrapLabel := "w:Wrap"
-	if vm.wordWrap {
-		wrapLabel = "w:Wrap[ON]"
-	}
-
-	// All help items in display order
-	helpItems := []string{
-		"←/q:Back", "↑↓/Space:Scroll", "⌫:PgUp", "0-9:%Jump",
-		"f:Fav", "a:FavAuthor", "b:Bookmark",
-		"e:Edit", "c:Export", "o:AuthorFiles", "v:ViewBookmarks",
-		wrapLabel, searchSuffix,
-	}
-
-	// Flow items into lines that fit within vm.width
-	footerRows := flowHelpItems(helpItems, vm.width)
-	vm.footerLines = len(footerRows)
-
-	for _, row := range footerRows {
-		rowWidth := lipgloss.Width(row)
-		if rowWidth < vm.width {
-			row = row + strings.Repeat(" ", vm.width-rowWidth)
-		} else if rowWidth > vm.width {
-			row = truncateToWidth(row, vm.width)
+	showHelpBar := vm.state.Config != nil && vm.state.Config.ShowViewerHelpBar
+	if showHelpBar {
+		// Footer bar - reflowing help items across 2-4 lines based on width
+		// Build search suffix
+		var searchSuffix string
+		if vm.EditingSearch {
+			searchSuffix = "[" + vm.searchInput.View() + "]"
+		} else if vm.searchText != "" && len(vm.matches) > 0 {
+			searchSuffix = fmt.Sprintf("[s:Search %s (%d/%d) | ←→:Nav x:Clear]", vm.searchText, vm.currentMatch+1, len(vm.matches))
+		} else if vm.searchText != "" {
+			searchSuffix = fmt.Sprintf("[s:Search %s (0/0) | x:Clear]", vm.searchText)
+		} else {
+			searchSuffix = "[s:Search]"
 		}
-		b.WriteString(vm.styles.HelpBar.Render(row))
-		b.WriteString("\n")
+
+		wrapLabel := "w:Wrap"
+		if vm.wordWrap {
+			wrapLabel = "w:Wrap[ON]"
+		}
+
+		// All help items in display order
+		helpItems := []string{
+			"←/q:Back", "↑↓/Space:Scroll", "⌫:PgUp", "0-9:%Jump",
+			"f:Fav", "a:FavAuthor", "b:Bookmark",
+			"e:Edit", "c:Export", "o:AuthorFiles", "v:ViewBookmarks",
+			wrapLabel, searchSuffix,
+		}
+
+		// Flow items into lines that fit within vm.width
+		footerRows := flowHelpItems(helpItems, vm.width)
+		vm.footerLines = len(footerRows)
+
+		for _, row := range footerRows {
+			rowWidth := lipgloss.Width(row)
+			if rowWidth < vm.width {
+				row = row + strings.Repeat(" ", vm.width-rowWidth)
+			} else if rowWidth > vm.width {
+				row = truncateToWidth(row, vm.width)
+			}
+			b.WriteString(vm.styles.HelpBar.Render(row))
+			b.WriteString("\n")
+		}
+	} else {
+		vm.footerLines = 0
 	}
 	// Remove trailing newline from last footer line
 	result := strings.TrimRight(b.String(), "\n")
@@ -1011,7 +1016,7 @@ func buildRuneSlice(runes []rune, start, end, maxWidth int) string {
 }
 
 // flowHelpItems distributes help items across lines, fitting as many per line
-// as the width allows. Returns 2-3 lines. Items are separated by spaces.
+// as the width allows. Returns up to 4 lines. Items are separated by spaces.
 func flowHelpItems(items []string, width int) []string {
 	if width <= 0 {
 		return []string{strings.Join(items, " ")}
@@ -1045,10 +1050,10 @@ func flowHelpItems(items []string, width int) []string {
 		lines = append(lines, current.String())
 	}
 
-	// Cap at 3 lines — if overflow, merge remaining onto line 3
-	if len(lines) > 3 {
-		merged := strings.Join(lines[2:], " ")
-		lines = []string{lines[0], lines[1], merged}
+	// Cap at 4 lines — if overflow, merge remaining onto line 4
+	if len(lines) > 4 {
+		merged := strings.Join(lines[3:], " ")
+		lines = []string{lines[0], lines[1], lines[2], merged}
 	}
 
 	if len(lines) == 0 {
@@ -1058,7 +1063,10 @@ func flowHelpItems(items []string, width int) []string {
 }
 
 func (vm *ViewerModel) getAvailableLines() int {
-	// Height minus title(1), second bar(1), footer(2 or 3)
+	if vm.state.Config != nil && !vm.state.Config.ShowViewerHelpBar {
+		return vm.height - 2
+	}
+	// Height minus title(1), second bar(1), footer(2 to 4)
 	footer := vm.footerLines
 	if footer < 2 {
 		footer = 2 // minimum before first render computes it
