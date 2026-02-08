@@ -144,6 +144,38 @@ func (vm *ViewerModel) loadFile() {
 	}
 }
 
+// cp1252ToUTF8 maps Windows-1252 bytes 0x80-0x9F to plain ASCII equivalents.
+// Smart quotes and dashes are normalised to their simple counterparts.
+var cp1252ToUTF8 = map[byte]string{
+	0x80: "E",  // Euro sign → E
+	0x82: ",",  // single low-9 quote
+	0x83: "f",  // Latin small f with hook
+	0x84: "\"", // double low-9 quote
+	0x85: "...", // horizontal ellipsis
+	0x86: "+",  // dagger
+	0x87: "+",  // double dagger
+	0x88: "^",  // modifier letter circumflex
+	0x89: "%",  // per mille sign
+	0x8A: "S",  // S with caron
+	0x8B: "<",  // single left-pointing angle quote
+	0x8C: "OE", // OE ligature
+	0x8E: "Z",  // Z with caron
+	0x91: "'",  // left single quote
+	0x92: "'",  // right single quote / apostrophe
+	0x93: "\"", // left double quote
+	0x94: "\"", // right double quote
+	0x95: "*",  // bullet
+	0x96: "-",  // en dash
+	0x97: "--", // em dash
+	0x98: "~",  // small tilde
+	0x99: "TM", // trade mark
+	0x9A: "s",  // s with caron
+	0x9B: ">",  // single right-pointing angle quote
+	0x9C: "oe", // oe ligature
+	0x9E: "z",  // z with caron
+	0x9F: "Y",  // Y with diaeresis
+}
+
 // decodeContent tries to decode file content with multiple encoding fallbacks
 func (vm *ViewerModel) decodeContent(data []byte) string {
 	// First, try UTF-8 (fast path)
@@ -151,11 +183,21 @@ func (vm *ViewerModel) decodeContent(data []byte) string {
 		return string(data)
 	}
 
-	// If not valid UTF-8, try to clean it up by replacing invalid sequences
-	// This handles files that are mostly UTF-8 but have some invalid characters
-	content := strings.ToValidUTF8(string(data), "�")
-
-	return content
+	// Not valid UTF-8 — treat as Windows-1252 (CP1252) and convert to UTF-8.
+	// Bytes 0x80-0x9F are mapped to plain ASCII equivalents; bytes 0xA0-0xFF
+	// are identical to Latin-1 and converted via their Unicode code point.
+	var b strings.Builder
+	b.Grow(len(data))
+	for _, c := range data {
+		if c < 0x80 {
+			b.WriteByte(c)
+		} else if repl, ok := cp1252ToUTF8[c]; ok {
+			b.WriteString(repl)
+		} else {
+			b.WriteRune(rune(c)) // 0xA0-0xFF → Latin-1 / Unicode
+		}
+	}
+	return b.String()
 }
 
 // sanitizeLineForDisplay removes or replaces characters that might cause terminal issues
