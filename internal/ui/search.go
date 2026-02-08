@@ -195,6 +195,18 @@ func (sm *SearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return sm, tea.Batch(sm.performSearch(true), tickCmd())
 			}
 
+		// Explore author of selected result
+		case "e":
+			if len(sm.results) > 0 && sm.cursor < len(sm.results) {
+				result := sm.results[sm.cursor]
+				authorFolder := filepath.Dir(result.FilePath)
+				return sm, func() tea.Msg {
+					return openAuthorFilesMsg{
+						authorFolder: authorFolder,
+					}
+				}
+			}
+
 		// Start new search
 		case "/":
 			sm.textInput.Focus()
