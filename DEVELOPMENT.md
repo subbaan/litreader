@@ -74,6 +74,19 @@ litreader/
 - Author files browser (press Enter on an author to view their files)
 - File scanning on startup (enables search functionality)
 
+### Changelog
+
+#### v2.6.3
+- Redesigned viewer help bar layout: items are now semantically grouped with pipe separators instead of greedy flow wrapping
+- Help bar uses 3 lines by default (wide/medium terminals) and 4 lines for narrow terminals
+- Improved readability with logically grouped keybindings (navigation, actions, utilities)
+
+#### v2.6.2
+- Fix juddering scroll in word-wrap mode
+
+#### v2.6.1
+- Add word-wrap toggle and reflowing help bar
+
 ## Configuration File Format
 
 The configuration file is located at `~/.config/litreader/litreader.conf` and uses a simple key-value format:

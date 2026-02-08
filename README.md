@@ -102,7 +102,7 @@ sudo mv litreader /usr/local/bin/
 
 ## Version
 
-Current: v2.5.6
+Current: v2.6.3
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for technical documentation and changelog.
 
