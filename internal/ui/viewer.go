@@ -726,34 +726,41 @@ func (vm *ViewerModel) View() string {
 
 	showHelpBar := vm.state.Config != nil && vm.state.Config.ShowViewerHelpBar
 	if showHelpBar {
-		// Footer bar - reflowing help items across 2-4 lines based on width
+		// Footer bar - grouped help items based on terminal width
 		// Build search suffix
 		var searchSuffix string
 		if vm.EditingSearch {
 			searchSuffix = "[" + vm.searchInput.View() + "]"
 		} else if vm.searchText != "" && len(vm.matches) > 0 {
-			searchSuffix = fmt.Sprintf("[s:Search %s (%d/%d) | ←→:Nav x:Clear]", vm.searchText, vm.currentMatch+1, len(vm.matches))
+			searchSuffix = fmt.Sprintf("s:search %s (%d/%d) | ←/→:nav | x:clear", vm.searchText, vm.currentMatch+1, len(vm.matches))
 		} else if vm.searchText != "" {
-			searchSuffix = fmt.Sprintf("[s:Search %s (0/0) | x:Clear]", vm.searchText)
+			searchSuffix = fmt.Sprintf("s:search %s (0/0) | x:clear", vm.searchText)
 		} else {
-			searchSuffix = "[s:Search]"
+			searchSuffix = "s:search"
 		}
 
-		wrapLabel := "w:Wrap"
+		wrapLabel := "w:wrap"
 		if vm.wordWrap {
-			wrapLabel = "w:Wrap[ON]"
+			wrapLabel = "w:wrap[ON]"
 		}
 
-		// All help items in display order
-		helpItems := []string{
-			"←/q:Back", "↑↓/Space:Scroll", "⌫:PgUp", "0-9:%Jump",
-			"f:Fav", "a:FavAuthor", "b:Bookmark",
-			"e:Edit", "c:Export", "o:AuthorFiles", "v:ViewBookmarks",
-			wrapLabel, searchSuffix,
+		// Build grouped help lines based on terminal width
+		var footerRows []string
+		w := vm.width
+		if w > 70 {
+			// Wide/Medium: 3 lines
+			line1 := "←/q:back | ↑/↓/space:scroll | ⌫:pgup | 0-9:%jump"
+			line2 := "f:fav | a:fav author | b:bookmark | e:edit | c:export | o:author files"
+			line3 := "v:bookmarks | " + wrapLabel + " | " + searchSuffix
+			footerRows = []string{line1, line2, line3}
+		} else {
+			// Narrow: 4 lines
+			line1 := "←/q:back | ↑/↓/space:scroll | ⌫:pgup"
+			line2 := "f:fav | a:fav author | b:bookmark"
+			line3 := "e:edit | c:export | o:author | v:bookmarks"
+			line4 := "0-9:%jump | " + wrapLabel + " | " + searchSuffix
+			footerRows = []string{line1, line2, line3, line4}
 		}
-
-		// Flow items into lines that fit within vm.width
-		footerRows := flowHelpItems(helpItems, vm.width)
 		vm.footerLines = len(footerRows)
 
 		for _, row := range footerRows {
@@ -1015,61 +1022,15 @@ func buildRuneSlice(runes []rune, start, end, maxWidth int) string {
 	return b.String()
 }
 
-// flowHelpItems distributes help items across lines, fitting as many per line
-// as the width allows. Returns up to 4 lines. Items are separated by spaces.
-func flowHelpItems(items []string, width int) []string {
-	if width <= 0 {
-		return []string{strings.Join(items, " ")}
-	}
-
-	var lines []string
-	var current strings.Builder
-	currentWidth := 0
-
-	for _, item := range items {
-		itemWidth := lipgloss.Width(item)
-
-		if currentWidth == 0 {
-			// First item on this line
-			current.WriteString(item)
-			currentWidth = itemWidth
-		} else if currentWidth+1+itemWidth <= width {
-			// Fits on current line with a space separator
-			current.WriteString(" ")
-			current.WriteString(item)
-			currentWidth += 1 + itemWidth
-		} else {
-			// Start a new line
-			lines = append(lines, current.String())
-			current.Reset()
-			current.WriteString(item)
-			currentWidth = itemWidth
-		}
-	}
-	if current.Len() > 0 {
-		lines = append(lines, current.String())
-	}
-
-	// Cap at 4 lines — if overflow, merge remaining onto line 4
-	if len(lines) > 4 {
-		merged := strings.Join(lines[3:], " ")
-		lines = []string{lines[0], lines[1], lines[2], merged}
-	}
-
-	if len(lines) == 0 {
-		return []string{""}
-	}
-	return lines
-}
 
 func (vm *ViewerModel) getAvailableLines() int {
 	if vm.state.Config != nil && !vm.state.Config.ShowViewerHelpBar {
 		return vm.height - 2
 	}
-	// Height minus title(1), second bar(1), footer(2 to 4)
+	// Height minus title(1), second bar(1), footer(3 to 4)
 	footer := vm.footerLines
-	if footer < 2 {
-		footer = 2 // minimum before first render computes it
+	if footer < 3 {
+		footer = 3 // minimum before first render computes it
 	}
 	return vm.height - 2 - footer
 }
