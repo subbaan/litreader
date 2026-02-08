@@ -114,20 +114,23 @@ func (vm *ViewerModel) loadFile() {
 	// Store original line count before pandoc rendering
 	vm.originalLineCount = strings.Count(content, "\n") + 1
 
-	// Render through pandoc if available (with panic recovery)
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				// If pandoc panics, just use the original content
-				vm.err = fmt.Errorf("pandoc rendering failed: %v", r)
+	// Render through pandoc if available (skip for .txt files — they're already plain text)
+	ext := strings.ToLower(filepath.Ext(vm.filename))
+	if ext != ".txt" {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					// If pandoc panics, just use the original content
+					vm.err = fmt.Errorf("pandoc rendering failed: %v", r)
+				}
+			}()
+
+			rendered, err := external.RenderMarkdown(content)
+			if err == nil {
+				content = rendered
 			}
 		}()
-
-		rendered, err := external.RenderMarkdown(content)
-		if err == nil {
-			content = rendered
-		}
-	}()
+	}
 
 	vm.lines = strings.Split(content, "\n")
 	vm.totalLines = len(vm.lines)
