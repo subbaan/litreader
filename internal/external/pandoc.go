@@ -31,7 +31,7 @@ func RenderMarkdown(content string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), pandocTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "pandoc", "-f", "markdown", "-t", "plain")
+	cmd := exec.CommandContext(ctx, "pandoc", "-f", "markdown", "-t", "plain", "--wrap=preserve")
 	cmd.Stdin = strings.NewReader(content)
 
 	output, err := cmd.Output()
