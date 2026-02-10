@@ -142,6 +142,9 @@ func (em *EditorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyTab:
 			em.insertChar('\t')
 
+		case tea.KeySpace:
+			em.insertChar(' ')
+
 		case tea.KeyRunes:
 			for _, r := range msg.Runes {
 				em.insertChar(r)
@@ -345,12 +348,13 @@ func (em *EditorModel) View() string {
 			// Render line with cursor
 			b.WriteString(em.renderLineWithCursor(line, lineNumWidth))
 		} else {
-			// Truncate if needed
+			// Expand tabs and truncate if needed
+			displayLine := expandTabs(line, editorTabWidth)
 			availWidth := em.width - lineNumWidth - 1
-			if len(line) > availWidth {
-				line = line[:availWidth]
+			if len(displayLine) > availWidth {
+				displayLine = displayLine[:availWidth]
 			}
-			b.WriteString(line)
+			b.WriteString(displayLine)
 		}
 		b.WriteString("\n")
 	}
@@ -379,27 +383,28 @@ func (em *EditorModel) View() string {
 func (em *EditorModel) renderLineWithCursor(line string, lineNumWidth int) string {
 	availWidth := em.width - lineNumWidth - 1
 
-	// Handle cursor position
-	cursorPos := em.cursorCol
+	// Expand tabs for display and map cursor position
+	displayLine := expandTabs(line, editorTabWidth)
+	displayCursorCol := tabExpandedCol(line, em.cursorCol, editorTabWidth)
 
 	// If line is longer than available width, we need to scroll horizontally
 	startCol := 0
-	if cursorPos >= availWidth {
-		startCol = cursorPos - availWidth + 1
+	if displayCursorCol >= availWidth {
+		startCol = displayCursorCol - availWidth + 1
 	}
 
 	// Extract visible portion
 	visibleLine := ""
-	if startCol < len(line) {
+	if startCol < len(displayLine) {
 		endCol := startCol + availWidth
-		if endCol > len(line) {
-			endCol = len(line)
+		if endCol > len(displayLine) {
+			endCol = len(displayLine)
 		}
-		visibleLine = line[startCol:endCol]
+		visibleLine = displayLine[startCol:endCol]
 	}
 
 	// Adjust cursor position for display
-	displayCursorPos := cursorPos - startCol
+	displayCursorPos := displayCursorCol - startCol
 
 	// Build the line with cursor highlight
 	var result strings.Builder
@@ -421,6 +426,40 @@ func (em *EditorModel) renderLineWithCursor(line string, lineNumWidth int) strin
 	}
 
 	return result.String()
+}
+
+const editorTabWidth = 4
+
+// expandTabs replaces tab characters with spaces aligned to tab stops.
+func expandTabs(s string, tw int) string {
+	var b strings.Builder
+	col := 0
+	for _, ch := range s {
+		if ch == '\t' {
+			spaces := tw - (col % tw)
+			for j := 0; j < spaces; j++ {
+				b.WriteByte(' ')
+			}
+			col += spaces
+		} else {
+			b.WriteRune(ch)
+			col++
+		}
+	}
+	return b.String()
+}
+
+// tabExpandedCol maps a byte offset in s to a display column after tab expansion.
+func tabExpandedCol(s string, byteCol int, tw int) int {
+	displayCol := 0
+	for i := 0; i < len(s) && i < byteCol; i++ {
+		if s[i] == '\t' {
+			displayCol += tw - (displayCol % tw)
+		} else {
+			displayCol++
+		}
+	}
+	return displayCol
 }
 
 // Ensure EditorModel implements tea.Model
