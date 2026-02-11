@@ -93,6 +93,8 @@ func Load() (*Config, error) {
 			config.ContentBold = parseBool(value)
 		case "viewer_help_bar":
 			config.ShowViewerHelpBar = parseBool(value)
+		case "show_ratings":
+			config.ShowRatings = parseBool(value)
 		case "last_file":
 			config.LastFile = value
 		case "position":

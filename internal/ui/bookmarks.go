@@ -138,20 +138,26 @@ func (bm *BookmarksModel) View() string {
 			bookmark := bm.bookmarks[itemIdx]
 			isSelected := itemIdx == bm.cursor
 
-			// Format: [4.68] filename.txt: "note text" (Line 123)
-			ratingStr := "N/A "
-			if bookmark.Rating != nil {
-				ratingStr = fmt.Sprintf("%.2f", *bookmark.Rating)
-			}
-
 			filename := filepath.Base(bookmark.Filename)
 			note := bookmark.Note
 			if len(note) > 30 {
 				note = note[:27] + "..."
 			}
 
-			line := fmt.Sprintf("  [%s] %s: \"%s\" (Line %d)",
-				ratingStr, filename, note, bookmark.Position)
+			var line string
+			if bm.state.Config.ShowRatings {
+				// Format: [4.68] filename.txt: "note text" (Line 123)
+				ratingStr := "N/A "
+				if bookmark.Rating != nil {
+					ratingStr = fmt.Sprintf("%.2f", *bookmark.Rating)
+				}
+				line = fmt.Sprintf("  [%s] %s: \"%s\" (Line %d)",
+					ratingStr, filename, note, bookmark.Position)
+			} else {
+				// Format: filename.txt: "note text" (Line 123)
+				line = fmt.Sprintf("  %s: \"%s\" (Line %d)",
+					filename, note, bookmark.Position)
+			}
 
 			// Truncate if too long
 			if len(line) > bm.width-1 {

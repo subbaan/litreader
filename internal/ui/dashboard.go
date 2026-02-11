@@ -253,13 +253,14 @@ func (dm *DashboardModel) View() string {
 	b.WriteString(fmt.Sprintf("    Total Stories: %s\n", formatWithCommas(dm.totalFiles)))
 	b.WriteString(fmt.Sprintf("    Total Size: %.1f MB\n", dm.totalSizeMB))
 
-	if dm.avgRating > 0 {
-		b.WriteString(fmt.Sprintf("    Average Rating: %.2f/5.0\n", dm.avgRating))
-	} else {
-		b.WriteString("    Average Rating: N/A\n")
+	if dm.state.Config.ShowRatings {
+		if dm.avgRating > 0 {
+			b.WriteString(fmt.Sprintf("    Average Rating: %.2f/5.0\n", dm.avgRating))
+		} else {
+			b.WriteString("    Average Rating: N/A\n")
+		}
+		b.WriteString(fmt.Sprintf("    Rated Stories: %s/%s\n", formatWithCommas(dm.ratedCount), formatWithCommas(dm.totalFiles)))
 	}
-
-	b.WriteString(fmt.Sprintf("    Rated Stories: %s/%s\n", formatWithCommas(dm.ratedCount), formatWithCommas(dm.totalFiles)))
 	b.WriteString("\n")
 
 	// YOUR COLLECTIONS
@@ -312,16 +313,23 @@ func (dm *DashboardModel) View() string {
 			item := dm.inProgress[itemIdx]
 			isSelected := itemIdx == dm.cursor
 
-			// Format: [=======>-----] 45.3% | 4.68 | filename.txt
 			progressBar := createProgressBar(item.Percentage, 20)
-			ratingStr := "N/A "
-			if item.Favorite.Rating != nil {
-				ratingStr = fmt.Sprintf("%.2f", *item.Favorite.Rating)
-			}
-
 			filename := filepath.Base(item.Favorite.Filename)
-			line := fmt.Sprintf("  [%s] %5.1f%% | %s | %s",
-				progressBar, item.Percentage, ratingStr, filename)
+
+			var line string
+			if dm.state.Config.ShowRatings {
+				// Format: [=======>-----] 45.3% | 4.68 | filename.txt
+				ratingStr := "N/A "
+				if item.Favorite.Rating != nil {
+					ratingStr = fmt.Sprintf("%.2f", *item.Favorite.Rating)
+				}
+				line = fmt.Sprintf("  [%s] %5.1f%% | %s | %s",
+					progressBar, item.Percentage, ratingStr, filename)
+			} else {
+				// Format: [=======>-----] 45.3% | filename.txt
+				line = fmt.Sprintf("  [%s] %5.1f%% | %s",
+					progressBar, item.Percentage, filename)
+			}
 
 			// Truncate if too long
 			if len(line) > dm.width-1 {

@@ -93,6 +93,10 @@ func (fm *FavoritesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Sort mode
 		case "t":
 			fm.sortMode = (fm.sortMode + 1) % 3
+			// Skip rating mode (2) when ShowRatings is false
+			if !fm.state.Config.ShowRatings && fm.sortMode == 2 {
+				fm.sortMode = 0
+			}
 			fm.sortFavorites()
 
 		// Delete favorite
@@ -129,7 +133,8 @@ func (fm *FavoritesModel) View() string {
 	var b strings.Builder
 
 	// Title bar
-	sortName := []string{"Name", "Date", "Rating"}[fm.sortMode]
+	sortNames := []string{"Name", "Date", "Rating"}
+	sortName := sortNames[fm.sortMode]
 	title := fmt.Sprintf("Favorites (%d) - Sort: %s", len(fm.favorites), sortName)
 	b.WriteString(fm.styles.RenderTitle(title, fm.width))
 	b.WriteString("\n\n")
@@ -158,14 +163,19 @@ func (fm *FavoritesModel) View() string {
 			// Get author (parent directory name)
 			author := filepath.Base(filepath.Dir(fav.Filename))
 
-			// Format: [4.68] | 123.45 KB | AuthorName | filename.txt
-			ratingStr := "N/A "
-			if fav.Rating != nil {
-				ratingStr = fmt.Sprintf("%.2f", *fav.Rating)
-			}
-
 			filename := filepath.Base(fav.Filename)
-			line := fmt.Sprintf("  [%s] | %10.2f KB | %-20s | %s", ratingStr, fileSize, author, filename)
+			var line string
+			if fm.state.Config.ShowRatings {
+				// Format: [4.68] | 123.45 KB | AuthorName | filename.txt
+				ratingStr := "N/A "
+				if fav.Rating != nil {
+					ratingStr = fmt.Sprintf("%.2f", *fav.Rating)
+				}
+				line = fmt.Sprintf("  [%s] | %10.2f KB | %-20s | %s", ratingStr, fileSize, author, filename)
+			} else {
+				// Format: 123.45 KB | AuthorName | filename.txt
+				line = fmt.Sprintf("  %10.2f KB | %-20s | %s", fileSize, author, filename)
+			}
 
 			// Truncate if too long
 			if len(line) > fm.width-1 {
