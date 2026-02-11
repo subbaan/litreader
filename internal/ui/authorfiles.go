@@ -197,20 +197,24 @@ func (afm *AuthorFilesModel) View() string {
 				fileSize = float64(info.Size()) / 1024.0 // KB
 			}
 
-			// Get rating
-			rating, err := library.ExtractRating(file)
-			ratingStr := "N/A"
-			if err == nil && rating > 0 {
-				ratingStr = fmt.Sprintf("%.2f", rating)
-			}
-
-			// Format: favorite | size | rating | filename
+			// Format: favorite | size | [rating |] filename
 			filename := filepath.Base(file)
 			heart := " "
 			if afm.favoriteSet[file] {
 				heart = "\uf004"
 			}
-			line := fmt.Sprintf("  %s %10.2f KB | %4s | %s", heart, fileSize, ratingStr, filename)
+
+			var line string
+			if afm.state.Config.ShowRatings {
+				rating, err := library.ExtractRating(file)
+				ratingStr := "N/A"
+				if err == nil && rating > 0 {
+					ratingStr = fmt.Sprintf("%.2f", rating)
+				}
+				line = fmt.Sprintf("  %s %10.2f KB | %4s | %s", heart, fileSize, ratingStr, filename)
+			} else {
+				line = fmt.Sprintf("  %s %10.2f KB | %s", heart, fileSize, filename)
+			}
 
 			// Truncate if too long
 			if len(line) > afm.width-1 {

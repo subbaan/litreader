@@ -301,11 +301,13 @@ func (am *AuthorsModel) renderAuthorInfo(width, height int) string {
 	} else {
 		b.WriteString("  Longest: N/A\n")
 	}
-	if am.info.ratingCount > 0 {
-		avg := am.info.avgRating / float64(am.info.ratingCount)
-		b.WriteString(fmt.Sprintf("  Avg Rating: %.2f\n", avg))
-	} else {
-		b.WriteString("  Avg Rating: N/A\n")
+	if am.state.Config.ShowRatings {
+		if am.info.ratingCount > 0 {
+			avg := am.info.avgRating / float64(am.info.ratingCount)
+			b.WriteString(fmt.Sprintf("  Avg Rating: %.2f\n", avg))
+		} else {
+			b.WriteString("  Avg Rating: N/A\n")
+		}
 	}
 
 	b.WriteString("\n")

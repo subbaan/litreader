@@ -169,6 +169,45 @@ func (sm *SearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
+		case "pgup":
+			availableLines := sm.getAvailableLines()
+			sm.cursor -= availableLines
+			if sm.cursor < 0 {
+				sm.cursor = 0
+			}
+			sm.topRow -= availableLines
+			if sm.topRow < 0 {
+				sm.topRow = 0
+			}
+
+		case "pgdown":
+			availableLines := sm.getAvailableLines()
+			sm.cursor += availableLines
+			if sm.cursor >= len(sm.results) {
+				sm.cursor = len(sm.results) - 1
+			}
+			if sm.cursor < 0 {
+				sm.cursor = 0
+			}
+			sm.topRow = sm.cursor - availableLines + 1
+			if sm.topRow < 0 {
+				sm.topRow = 0
+			}
+
+		case "home":
+			sm.cursor = 0
+			sm.topRow = 0
+
+		case "end":
+			if len(sm.results) > 0 {
+				sm.cursor = len(sm.results) - 1
+				availableLines := sm.getAvailableLines()
+				sm.topRow = sm.cursor - availableLines + 1
+				if sm.topRow < 0 {
+					sm.topRow = 0
+				}
+			}
+
 		// Open selected result
 		case "enter", "right":
 			if len(sm.results) > 0 && sm.cursor < len(sm.results) {
@@ -185,6 +224,10 @@ func (sm *SearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Sort (cycle through 7 modes)
 		case "t":
 			sm.sortMode = (sm.sortMode + 1) % 7
+			// Skip rating modes (0, 1) when ShowRatings is false
+			for !sm.state.Config.ShowRatings && (sm.sortMode == 0 || sm.sortMode == 1) {
+				sm.sortMode = (sm.sortMode + 1) % 7
+			}
 			sm.sortResults()
 
 		// Force refresh (bypass cache)
@@ -261,6 +304,9 @@ func (sm *SearchModel) View() string {
 		// Status bar showing search query, sort mode, and result position
 		sortModes := []string{"Rating Desc", "Rating Asc", "Size Asc", "Size Desc", "Matches Asc", "Matches Desc", "Name"}
 		sortText := sortModes[sm.sortMode]
+		if !sm.state.Config.ShowRatings && (sm.sortMode == 0 || sm.sortMode == 1) {
+			sortText = sortModes[2] // fallback display
+		}
 		cacheIndicator := ""
 		if sm.query != "" && len(sm.results) > 0 {
 			if sm.fromCache {
@@ -345,13 +391,6 @@ func (sm *SearchModel) View() string {
 				fileSize = float64(info.Size()) / 1024.0 // KB
 			}
 
-			// Get rating
-			rating, err := library.ExtractRating(result.FilePath)
-			ratingStr := "0"
-			if err == nil && rating > 0 {
-				ratingStr = fmt.Sprintf("%.2f", rating)
-			}
-
 			// Format match count with padding (e.g., "015")
 			countDisplay := fmt.Sprintf("%03d", result.MatchCount)
 
@@ -359,8 +398,20 @@ func (sm *SearchModel) View() string {
 			displayPath := strings.TrimPrefix(result.FilePath, sm.state.Config.SearchDir)
 			displayPath = strings.TrimPrefix(displayPath, "/")
 
-			// Format: count | file_size | rating | path/to/file.txt (matching Python version)
-			line := fmt.Sprintf("%s | %10.2f KB | %4s | %s", countDisplay, fileSize, ratingStr, displayPath)
+			var line string
+			if sm.state.Config.ShowRatings {
+				// Get rating
+				rating, err := library.ExtractRating(result.FilePath)
+				ratingStr := "0"
+				if err == nil && rating > 0 {
+					ratingStr = fmt.Sprintf("%.2f", rating)
+				}
+				// Format: count | file_size | rating | path/to/file.txt
+				line = fmt.Sprintf("%s | %10.2f KB | %4s | %s", countDisplay, fileSize, ratingStr, displayPath)
+			} else {
+				// Format: count | file_size | path/to/file.txt
+				line = fmt.Sprintf("%s | %10.2f KB | %s", countDisplay, fileSize, displayPath)
+			}
 
 			// Truncate if too long
 			if len(line) > sm.width-1 {
@@ -389,7 +440,7 @@ func (sm *SearchModel) View() string {
 	if sm.textInput.Focused() {
 		helpText = "↵:Search Esc:Cancel"
 	} else {
-		helpText = "/:Search ↑↓:Navigate ↵:Open t:Sort r:Refresh q:Back"
+		helpText = "/:Search ↑↓:Navigate PgUp/Dn:Page Home/End:Jump ↵:Open t:Sort r:Refresh q:Back"
 	}
 	b.WriteString(sm.styles.RenderHelpBar(helpText, sm.width))
 

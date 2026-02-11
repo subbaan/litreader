@@ -20,6 +20,7 @@ type Config struct {
 	ContentColor         string
 	ContentBold          bool
 	ShowViewerHelpBar    bool
+	ShowRatings          bool
 	LastFile             string
 	Position             int
 	SearchText           string
@@ -43,6 +44,7 @@ func NewDefaultConfig() *Config {
 		ContentColor:         "white",
 		ContentBold:          false,
 		ShowViewerHelpBar:    true,
+		ShowRatings:          true,
 		LastFile:             "",
 		Position:             0,
 		SearchText:           "",

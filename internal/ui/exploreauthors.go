@@ -298,6 +298,10 @@ func (em *ExploreAuthorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Toggle sort mode
 		case "t":
 			em.sortMode = (em.sortMode + 1) % 4
+			// Skip rating mode (3) when ShowRatings is false
+			if !em.state.Config.ShowRatings && em.sortMode == 3 {
+				em.sortMode = 0
+			}
 			em.sortAuthors()
 
 		// Toggle favorite
@@ -348,8 +352,8 @@ func (em *ExploreAuthorsModel) View() string {
 		b.WriteString("\n")
 	} else {
 		// Sort indicator
-		sortModes := []string{"Name", "Count", "Size", "Rating"}
-		sortText := sortModes[em.sortMode]
+		allSortModes := []string{"Name", "Count", "Size", "Rating"}
+		sortText := allSortModes[em.sortMode]
 		filterText := ""
 		if em.filterInput.Value() != "" {
 			filterText = fmt.Sprintf(" | Filter: \"%s\"", em.filterInput.Value())
@@ -390,20 +394,25 @@ func (em *ExploreAuthorsModel) View() string {
 				sizeStr = fmt.Sprintf("%6.1f KB", float64(author.TotalSize)/1024)
 			}
 
-			// Format rating
-			ratingStr := " N/A"
-			if author.AvgRating > 0 {
-				ratingStr = fmt.Sprintf("%.2f", author.AvgRating)
-			}
-
 			// Favorite indicator
 			favIndicator := "  "
 			if author.IsFavorite {
 				favIndicator = "* "
 			}
 
-			// Format: [count] [size] [rating] [fav] AuthorName
-			line := fmt.Sprintf("  %s | %s | %s | %s%s", countStr, sizeStr, ratingStr, favIndicator, author.Name)
+			var line string
+			if em.state.Config.ShowRatings {
+				// Format rating
+				ratingStr := " N/A"
+				if author.AvgRating > 0 {
+					ratingStr = fmt.Sprintf("%.2f", author.AvgRating)
+				}
+				// Format: [count] [size] [rating] [fav] AuthorName
+				line = fmt.Sprintf("  %s | %s | %s | %s%s", countStr, sizeStr, ratingStr, favIndicator, author.Name)
+			} else {
+				// Format: [count] [size] [fav] AuthorName
+				line = fmt.Sprintf("  %s | %s | %s%s", countStr, sizeStr, favIndicator, author.Name)
+			}
 
 			// Truncate if too long
 			if len(line) > em.width-1 {
