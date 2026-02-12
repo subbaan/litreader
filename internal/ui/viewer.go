@@ -538,9 +538,7 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					vm.wrapTopOffset = 0
 				}
 			} else {
-				// No search matches, use left arrow to go back
-				vm.savePosition()
-				// Let app.go handle navigation
+				// No search matches — app.go handles savePosition and navigation
 			}
 
 		// Open author files
