@@ -437,7 +437,7 @@ func (a *App) handleNavigation(key tea.KeyMsg) tea.Cmd {
 	if keyStr == "left" && a.currentView != ViewDashboard {
 		// Check if viewer is in a special mode that should handle left arrow
 		if a.currentView == ViewFile && a.viewer != nil {
-			if a.viewer.ViewingBookmarks || a.viewer.EditingSearch || a.viewer.EditingBookmark {
+			if a.viewer.ViewingBookmarks || a.viewer.EditingSearch || a.viewer.EditingBookmark || len(a.viewer.matches) > 0 {
 				// Don't navigate - viewer is handling the key
 				return nil
 			}
@@ -448,6 +448,7 @@ func (a *App) handleNavigation(key tea.KeyMsg) tea.Cmd {
 		}
 		// Reload dashboard data after returning
 		if a.currentView == ViewFile {
+			a.viewer.savePosition()
 			a.dashboard.calculateInProgress()
 		}
 		return a.navigateBack()
