@@ -19,6 +19,9 @@ type State struct {
 	FileMetadata map[string]*cache.FileMetadata // Cached metadata (size, rating)
 	FileInfo     map[string]*models.FileInfo
 
+	// Direct file open mode (litreader somefile.txt)
+	DirectFile string
+
 	// Search state
 	LastSearchQuery   string
 	LastSearchResults []cache.SearchResult

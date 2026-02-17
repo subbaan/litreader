@@ -41,11 +41,12 @@ func main() {
 	if *showHelp || *showHelpLong {
 		fmt.Printf("%s - Terminal-based text file reader and library manager\n\n", appName)
 		fmt.Println("Usage:")
-		fmt.Printf("  %s [options]\n\n", appName)
+		fmt.Printf("  %s [options] [file]\n\n", appName)
 		fmt.Println("Options:")
 		fmt.Println("  -h, --help       Show this help message")
 		fmt.Println("  -v, --version    Show version information")
 		fmt.Println("  -u               Force rebuild library cache")
+		fmt.Println("  [file]           Open a file directly in the viewer (bypasses library)")
 		fmt.Println("\nFeatures:")
 		fmt.Println("  - Browse and search your text file library")
 		fmt.Println("  - Favorites and bookmarks management")
@@ -89,6 +90,20 @@ func main() {
 	// Create application state
 	appState := state.NewState(cfg)
 	appState.Cache = cacheData
+
+	// Check for direct file argument
+	if args := flag.Args(); len(args) > 0 {
+		filePath, err := filepath.Abs(args[0])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error resolving file path: %v\n", err)
+			os.Exit(1)
+		}
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "File not found: %s\n", args[0])
+			os.Exit(1)
+		}
+		appState.DirectFile = filePath
+	}
 
 	// Create and run TUI
 	app := ui.NewApp(appState)
