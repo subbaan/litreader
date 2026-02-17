@@ -49,6 +49,9 @@ type App struct {
 	exploreAuthors *ExploreAuthorsModel
 	editor         *EditorModel
 
+	// Direct file open mode (litreader somefile.txt)
+	directFileMode bool
+
 	// Modal/popup state
 	showPopup bool
 	popupMsg  string
@@ -75,11 +78,22 @@ func NewApp(s *state.State) *App {
 	// Initialize dashboard
 	app.dashboard = NewDashboardModel(s, styles)
 
+	// Handle direct file mode (litreader somefile.txt)
+	if s.DirectFile != "" {
+		app.directFileMode = true
+		app.currentView = ViewFile
+		app.viewer = NewViewerModel(s, styles, s.DirectFile, 0, "")
+		// width/height are 0 here; WindowSizeMsg will update them
+	}
+
 	return app
 }
 
 // Init initializes the app (bubbletea interface)
 func (a *App) Init() tea.Cmd {
+	if a.directFileMode {
+		return nil
+	}
 	// Scan library files in background
 	return a.scanLibraryFiles
 }
@@ -449,6 +463,9 @@ func (a *App) handleNavigation(key tea.KeyMsg) tea.Cmd {
 		// Reload dashboard data after returning
 		if a.currentView == ViewFile {
 			a.viewer.savePosition()
+			if a.directFileMode && len(a.viewStack) == 0 {
+				return tea.Quit
+			}
 			a.dashboard.calculateInProgress()
 		}
 		return a.navigateBack()
@@ -462,8 +479,11 @@ func (a *App) handleNavigation(key tea.KeyMsg) tea.Cmd {
 	// In viewer, allow 'q' only if not in special modes (for quick quit comfort)
 	if keyStr == "q" && a.currentView == ViewFile && a.viewer != nil {
 		if !a.viewer.ViewingBookmarks && !a.viewer.EditingSearch && !a.viewer.EditingBookmark {
-			// Save and go back
+			// Save and go back (or quit in direct file mode)
 			a.viewer.savePosition()
+			if a.directFileMode && len(a.viewStack) == 0 {
+				return tea.Quit
+			}
 			if a.dashboard != nil {
 				a.dashboard.calculateInProgress()
 			}
