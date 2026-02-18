@@ -15,6 +15,49 @@ type editorDoneMsg struct {
 	saved bool
 }
 
+// editorSegment holds a wrapped visual segment of a display line.
+type editorSegment struct {
+	text  string
+	start int // byte offset in the tab-expanded display string where this segment starts
+}
+
+// editorWrapSegments splits a tab-expanded line into wrapped segments that fit within width bytes.
+// It breaks at word boundaries (spaces) where possible, otherwise hard-breaks at width.
+func editorWrapSegments(line string, width int) []editorSegment {
+	if width <= 0 || len(line) <= width {
+		return []editorSegment{{text: line, start: 0}}
+	}
+
+	var segs []editorSegment
+	pos := 0
+	n := len(line)
+
+	for pos < n {
+		if n-pos <= width {
+			segs = append(segs, editorSegment{text: line[pos:], start: pos})
+			break
+		}
+
+		// Find last ASCII space in [pos, pos+width) to break at a word boundary.
+		end := pos + width
+		breakAt := end
+		for i := end - 1; i > pos; i-- {
+			if line[i] == ' ' { // safe: ' ' is single-byte ASCII
+				breakAt = i + 1 // include the space in this segment
+				break
+			}
+		}
+
+		segs = append(segs, editorSegment{text: line[pos:breakAt], start: pos})
+		pos = breakAt
+	}
+
+	if len(segs) == 0 {
+		return []editorSegment{{text: line, start: 0}}
+	}
+	return segs
+}
+
 // EditorModel represents a simple text editor
 type EditorModel struct {
 	state  *state.State
@@ -34,6 +77,9 @@ type EditorModel struct {
 
 	// Viewport (top visible line)
 	topRow int
+
+	// Word wrap toggle
+	wordWrap bool
 
 	// Status message
 	statusMsg string
@@ -126,6 +172,9 @@ func (em *EditorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEnd:
 			em.cursorCol = len(em.currentLine())
 
+		case tea.KeyCtrlW:
+			em.wordWrap = !em.wordWrap
+
 		case tea.KeyPgUp:
 			em.pageUp()
 		case tea.KeyPgDown:
@@ -163,19 +212,73 @@ func (em *EditorModel) currentLine() string {
 }
 
 func (em *EditorModel) moveCursorUp() {
-	if em.cursorRow > 0 {
-		em.cursorRow--
-		em.clampCursorCol()
-		em.ensureCursorVisible()
+	if !em.wordWrap {
+		if em.cursorRow > 0 {
+			em.cursorRow--
+			em.clampCursorCol()
+			em.ensureCursorVisible()
+		}
+		return
 	}
+
+	// Word wrap: move by one visual row.
+	line := em.currentLine()
+	displayLine := expandTabs(line, editorTabWidth)
+	displayCursorCol := tabExpandedCol(line, em.cursorCol, editorTabWidth)
+	segs := editorWrapSegments(displayLine, em.availWidth())
+	curSegIdx, cursorPosInSeg := em.findSegment(segs, displayCursorCol)
+
+	if curSegIdx > 0 {
+		// Previous visual row is the previous segment of the same logical line.
+		prev := segs[curSegIdx-1]
+		target := prev.start + min(cursorPosInSeg, len(prev.text))
+		em.cursorCol = tabExpandedColToByteOffset(line, target, editorTabWidth)
+	} else if em.cursorRow > 0 {
+		// Move to the last segment of the previous logical line.
+		em.cursorRow--
+		prevLine := em.currentLine()
+		prevDisplay := expandTabs(prevLine, editorTabWidth)
+		prevSegs := editorWrapSegments(prevDisplay, em.availWidth())
+		last := prevSegs[len(prevSegs)-1]
+		target := last.start + min(cursorPosInSeg, len(last.text))
+		em.cursorCol = tabExpandedColToByteOffset(prevLine, target, editorTabWidth)
+	}
+	em.ensureCursorVisible()
 }
 
 func (em *EditorModel) moveCursorDown() {
-	if em.cursorRow < len(em.lines)-1 {
-		em.cursorRow++
-		em.clampCursorCol()
-		em.ensureCursorVisible()
+	if !em.wordWrap {
+		if em.cursorRow < len(em.lines)-1 {
+			em.cursorRow++
+			em.clampCursorCol()
+			em.ensureCursorVisible()
+		}
+		return
 	}
+
+	// Word wrap: move by one visual row.
+	line := em.currentLine()
+	displayLine := expandTabs(line, editorTabWidth)
+	displayCursorCol := tabExpandedCol(line, em.cursorCol, editorTabWidth)
+	segs := editorWrapSegments(displayLine, em.availWidth())
+	curSegIdx, cursorPosInSeg := em.findSegment(segs, displayCursorCol)
+
+	if curSegIdx < len(segs)-1 {
+		// Next visual row is the next segment of the same logical line.
+		next := segs[curSegIdx+1]
+		target := next.start + min(cursorPosInSeg, len(next.text))
+		em.cursorCol = tabExpandedColToByteOffset(line, target, editorTabWidth)
+	} else if em.cursorRow < len(em.lines)-1 {
+		// Move to the first segment of the next logical line.
+		em.cursorRow++
+		nextLine := em.currentLine()
+		nextDisplay := expandTabs(nextLine, editorTabWidth)
+		nextSegs := editorWrapSegments(nextDisplay, em.availWidth())
+		first := nextSegs[0]
+		target := first.start + min(cursorPosInSeg, len(first.text))
+		em.cursorCol = tabExpandedColToByteOffset(nextLine, target, editorTabWidth)
+	}
+	em.ensureCursorVisible()
 }
 
 func (em *EditorModel) moveCursorLeft() {
@@ -203,9 +306,23 @@ func (em *EditorModel) moveCursorRight() {
 
 func (em *EditorModel) pageUp() {
 	visible := em.getVisibleLines()
-	em.cursorRow -= visible
-	if em.cursorRow < 0 {
-		em.cursorRow = 0
+	if !em.wordWrap {
+		em.cursorRow -= visible
+		if em.cursorRow < 0 {
+			em.cursorRow = 0
+		}
+		em.clampCursorCol()
+		em.ensureCursorVisible()
+		return
+	}
+	// Word wrap: scroll back by approximately one screenful of visual rows.
+	rowsToSkip := visible
+	for rowsToSkip > 0 {
+		if em.cursorRow == 0 {
+			break
+		}
+		em.cursorRow--
+		rowsToSkip -= em.lineVisualRows(em.cursorRow)
 	}
 	em.clampCursorCol()
 	em.ensureCursorVisible()
@@ -213,12 +330,68 @@ func (em *EditorModel) pageUp() {
 
 func (em *EditorModel) pageDown() {
 	visible := em.getVisibleLines()
-	em.cursorRow += visible
+	if !em.wordWrap {
+		em.cursorRow += visible
+		if em.cursorRow >= len(em.lines) {
+			em.cursorRow = len(em.lines) - 1
+		}
+		em.clampCursorCol()
+		em.ensureCursorVisible()
+		return
+	}
+	// Word wrap: advance by approximately one screenful of visual rows.
+	rowsToSkip := visible
+	for rowsToSkip > 0 && em.cursorRow < len(em.lines)-1 {
+		rowsToSkip -= em.lineVisualRows(em.cursorRow)
+		em.cursorRow++
+	}
 	if em.cursorRow >= len(em.lines) {
 		em.cursorRow = len(em.lines) - 1
 	}
 	em.clampCursorCol()
 	em.ensureCursorVisible()
+}
+
+// availWidth returns the usable content width after subtracting the line-number gutter.
+func (em *EditorModel) availWidth() int {
+	lineNumWidth := len(fmt.Sprintf("%d", len(em.lines))) + 1
+	w := em.width - lineNumWidth - 1
+	if w < 1 {
+		return 1
+	}
+	return w
+}
+
+// findSegment returns the index of the segment containing displayCursorCol and
+// the cursor's column offset within that segment.
+func (em *EditorModel) findSegment(segs []editorSegment, displayCursorCol int) (segIdx int, posInSeg int) {
+	segIdx = len(segs) - 1
+	for i, seg := range segs {
+		segEnd := seg.start + len(seg.text)
+		if displayCursorCol < segEnd {
+			segIdx = i
+			break
+		}
+	}
+	posInSeg = displayCursorCol - segs[segIdx].start
+	return
+}
+
+// tabExpandedColToByteOffset is the inverse of tabExpandedCol: given a display
+// column in the tab-expanded string, it returns the byte offset in the original s.
+func tabExpandedColToByteOffset(s string, expandedCol int, tw int) int {
+	col := 0
+	for i := 0; i < len(s); i++ {
+		if col >= expandedCol {
+			return i
+		}
+		if s[i] == '\t' {
+			col += tw - (col % tw)
+		} else {
+			col++
+		}
+	}
+	return len(s)
 }
 
 func (em *EditorModel) clampCursorCol() {
@@ -234,12 +407,50 @@ func (em *EditorModel) ensureCursorVisible() {
 	// Scroll up if cursor is above viewport
 	if em.cursorRow < em.topRow {
 		em.topRow = em.cursorRow
+		return
 	}
 
-	// Scroll down if cursor is below viewport
-	if em.cursorRow >= em.topRow+visible {
-		em.topRow = em.cursorRow - visible + 1
+	if !em.wordWrap {
+		// Scroll down if cursor is below viewport
+		if em.cursorRow >= em.topRow+visible {
+			em.topRow = em.cursorRow - visible + 1
+		}
+		return
 	}
+
+	// Word wrap: advance topRow until cursor's visual rows fit in viewport.
+	for {
+		visualRows := 0
+		for i := em.topRow; i <= em.cursorRow; i++ {
+			visualRows += em.lineVisualRows(i)
+		}
+		if visualRows <= visible {
+			break
+		}
+		em.topRow++
+		if em.topRow > em.cursorRow {
+			em.topRow = em.cursorRow
+			break
+		}
+	}
+}
+
+// lineVisualRows returns the number of visual rows a logical line occupies when word-wrapped.
+func (em *EditorModel) lineVisualRows(lineIdx int) int {
+	if !em.wordWrap || em.width <= 0 {
+		return 1
+	}
+	lineNumWidth := len(fmt.Sprintf("%d", len(em.lines))) + 1
+	availWidth := em.width - lineNumWidth - 1
+	if availWidth <= 0 {
+		return 1
+	}
+	displayLine := expandTabs(em.lines[lineIdx], editorTabWidth)
+	segs := editorWrapSegments(displayLine, availWidth)
+	if len(segs) == 0 {
+		return 1
+	}
+	return len(segs)
 }
 
 func (em *EditorModel) getVisibleLines() int {
@@ -329,34 +540,95 @@ func (em *EditorModel) View() string {
 	// Content area
 	visibleLines := em.getVisibleLines()
 	lineNumWidth := len(fmt.Sprintf("%d", len(em.lines))) + 1
+	availWidth := em.width - lineNumWidth - 1
 
-	for i := 0; i < visibleLines; i++ {
-		lineIdx := em.topRow + i
+	cursorStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("230")).
+		Foreground(lipgloss.Color("0"))
+	lineNumStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+
+	visualRowsUsed := 0
+	lineIdx := em.topRow
+
+	for visualRowsUsed < visibleLines {
 		if lineIdx >= len(em.lines) {
 			b.WriteString("\n")
+			visualRowsUsed++
 			continue
 		}
 
-		// Line number
-		lineNum := fmt.Sprintf("%*d ", lineNumWidth, lineIdx+1)
-		lineNumStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-		b.WriteString(lineNumStyle.Render(lineNum))
-
-		// Line content with cursor
+		lineNumStr := fmt.Sprintf("%*d ", lineNumWidth, lineIdx+1)
 		line := em.lines[lineIdx]
-		if lineIdx == em.cursorRow {
-			// Render line with cursor
-			b.WriteString(em.renderLineWithCursor(line, lineNumWidth))
-		} else {
-			// Expand tabs and truncate if needed
-			displayLine := expandTabs(line, editorTabWidth)
-			availWidth := em.width - lineNumWidth - 1
-			if len(displayLine) > availWidth {
-				displayLine = displayLine[:availWidth]
+
+		if !em.wordWrap {
+			b.WriteString(lineNumStyle.Render(lineNumStr))
+			if lineIdx == em.cursorRow {
+				b.WriteString(em.renderLineWithCursor(line, lineNumWidth))
+			} else {
+				displayLine := expandTabs(line, editorTabWidth)
+				if len(displayLine) > availWidth {
+					displayLine = displayLine[:availWidth]
+				}
+				b.WriteString(displayLine)
 			}
-			b.WriteString(displayLine)
+			b.WriteString("\n")
+			visualRowsUsed++
+		} else {
+			// Word wrap: render each segment as its own visual row.
+			displayLine := expandTabs(line, editorTabWidth)
+			segs := editorWrapSegments(displayLine, availWidth)
+			if len(segs) == 0 {
+				segs = []editorSegment{{text: "", start: 0}}
+			}
+
+			displayCursorCol := -1
+			if lineIdx == em.cursorRow {
+				displayCursorCol = tabExpandedCol(line, em.cursorCol, editorTabWidth)
+			}
+
+			for segIdx, seg := range segs {
+				if visualRowsUsed >= visibleLines {
+					break
+				}
+
+				// First segment shows the line number; continuation rows indent.
+				if segIdx == 0 {
+					b.WriteString(lineNumStyle.Render(lineNumStr))
+				} else {
+					b.WriteString(strings.Repeat(" ", lineNumWidth+1))
+				}
+
+				if displayCursorCol >= 0 {
+					isLastSeg := segIdx == len(segs)-1
+					segLen := len(seg.text)
+					inSeg := seg.start <= displayCursorCol &&
+						(displayCursorCol < seg.start+segLen || isLastSeg)
+
+					if inSeg {
+						cursorPosInSeg := displayCursorCol - seg.start
+						for i, ch := range seg.text {
+							if i == cursorPosInSeg {
+								b.WriteString(cursorStyle.Render(string(ch)))
+							} else {
+								b.WriteRune(ch)
+							}
+						}
+						if cursorPosInSeg >= segLen {
+							b.WriteString(cursorStyle.Render(" "))
+						}
+					} else {
+						b.WriteString(seg.text)
+					}
+				} else {
+					b.WriteString(seg.text)
+				}
+
+				b.WriteString("\n")
+				visualRowsUsed++
+			}
 		}
-		b.WriteString("\n")
+
+		lineIdx++
 	}
 
 	// Footer
@@ -370,7 +642,11 @@ func (em *EditorModel) View() string {
 		status = fmt.Sprintf("Line %d/%d, Col %d", em.cursorRow+1, len(em.lines), em.cursorCol+1)
 	}
 
-	footer1 := " Ctrl+S:Save  Esc:Exit  Arrows:Move  PgUp/PgDn:Scroll "
+	wrapLabel := "^W:Wrap"
+	if em.wordWrap {
+		wrapLabel = "^W:Wrap[ON]"
+	}
+	footer1 := fmt.Sprintf(" Ctrl+S:Save  Esc:Exit  %s  Arrows:Move  PgUp/PgDn:Scroll ", wrapLabel)
 	footer2 := fmt.Sprintf(" %s ", status)
 
 	b.WriteString(footerStyle.Render(footer1))
