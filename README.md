@@ -34,6 +34,10 @@ A terminal-based ebook reader and library manager for your text story collection
 - Keyboard-driven interface with vim-style navigation
 - Built-in configuration editor
 
+**Multiple Collections**
+- Copy and rename the executable — `ficreader`, `logreader`, `workdocs` — and each binary automatically gets its own config, cache, and library
+- Tweak colors and directories per instance; they are fully independent
+
 ![Configuration](images/config.png)
 
 ## Screenshots
@@ -64,9 +68,21 @@ go build -o litreader ./cmd/litreader
 sudo mv litreader /usr/local/bin/
 ```
 
+## Multiple Collections
+
+Copy and rename the executable to run fully independent instances, each with its own library, config, cache, and color scheme:
+
+```bash
+cp litreader ficreader    # fiction library
+cp litreader logreader    # log files
+cp litreader workdocs     # work documents
+```
+
+Each binary stores its files under `~/.config/<name>/` and `~/.cache/<name>/` automatically — no extra setup needed. Just run it once and configure the directory.
+
 ## Quick Start
 
-1. Run `litreader` - config files are created automatically
+1. Run `litreader` — config files are created automatically
 2. Press `c` to open the configuration editor
 3. Set your `Search Directory` to your story library folder
 4. Press `q` to save and restart litreader
@@ -92,6 +108,7 @@ sudo mv litreader /usr/local/bin/
 | `↑/↓` or `j/k` | Scroll |
 | `Space/@` | Page down/up |
 | `0-9` | Jump to percentage |
+| `w` | Toggle word wrap |
 | `f` | Add to favorites |
 | `a` | Add author to favorites |
 | `b` | Add bookmark |
@@ -100,9 +117,19 @@ sudo mv litreader /usr/local/bin/
 | `o` | Browse author's files |
 | `q` or `←` | Back |
 
+**Editor**
+| Key | Action |
+|-----|--------|
+| `Ctrl+W` | Toggle word wrap |
+| `Ctrl+S` | Save |
+| `Arrows` | Move cursor (by visual row when wrapped) |
+| `PgUp/PgDn` | Scroll |
+| `Home/End` | Start/end of line |
+| `Esc` | Exit |
+
 ## Version
 
-Current: v2.6.3
+Current: v2.7.3
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for technical documentation and changelog.
 
