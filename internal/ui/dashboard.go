@@ -154,16 +154,27 @@ func (dm *DashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// Navigation
 		case "up", "k":
-			if dm.cursor > 0 {
-				dm.cursor--
+			if len(dm.inProgress) > 0 {
+				if dm.cursor > 0 {
+					dm.cursor--
+				} else {
+					dm.cursor = len(dm.inProgress) - 1
+					availableLines := dm.getAvailableLines()
+					dm.topRow = max(0, len(dm.inProgress)-availableLines)
+				}
 				if dm.cursor < dm.topRow {
-					dm.topRow--
+					dm.topRow = dm.cursor
 				}
 			}
 
 		case "down", "j":
-			if dm.cursor < len(dm.inProgress)-1 {
-				dm.cursor++
+			if len(dm.inProgress) > 0 {
+				if dm.cursor < len(dm.inProgress)-1 {
+					dm.cursor++
+				} else {
+					dm.cursor = 0
+					dm.topRow = 0
+				}
 				availableLines := dm.getAvailableLines()
 				if dm.cursor >= dm.topRow+availableLines {
 					dm.topRow++

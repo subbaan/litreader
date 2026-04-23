@@ -82,17 +82,28 @@ func (am *AuthorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// Navigation
 		case "up", "k":
-			if am.cursor > 0 {
-				am.cursor--
+			if len(am.authors) > 0 {
+				if am.cursor > 0 {
+					am.cursor--
+				} else {
+					am.cursor = len(am.authors) - 1
+					availableLines := am.getAvailableLines()
+					am.topRow = max(0, len(am.authors)-availableLines)
+				}
 				if am.cursor < am.topRow {
-					am.topRow--
+					am.topRow = am.cursor
 				}
 				am.refreshAuthorInfo()
 			}
 
 		case "down", "j":
-			if am.cursor < len(am.authors)-1 {
-				am.cursor++
+			if len(am.authors) > 0 {
+				if am.cursor < len(am.authors)-1 {
+					am.cursor++
+				} else {
+					am.cursor = 0
+					am.topRow = 0
+				}
 				availableLines := am.getAvailableLines()
 				if am.cursor >= am.topRow+availableLines {
 					am.topRow++

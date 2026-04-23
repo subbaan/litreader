@@ -153,16 +153,27 @@ func (sm *SearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// Navigation
 		case "up", "k":
-			if sm.cursor > 0 {
-				sm.cursor--
+			if len(sm.results) > 0 {
+				if sm.cursor > 0 {
+					sm.cursor--
+				} else {
+					sm.cursor = len(sm.results) - 1
+					availableLines := sm.getAvailableLines()
+					sm.topRow = max(0, len(sm.results)-availableLines)
+				}
 				if sm.cursor < sm.topRow {
-					sm.topRow--
+					sm.topRow = sm.cursor
 				}
 			}
 
 		case "down", "j":
-			if sm.cursor < len(sm.results)-1 {
-				sm.cursor++
+			if len(sm.results) > 0 {
+				if sm.cursor < len(sm.results)-1 {
+					sm.cursor++
+				} else {
+					sm.cursor = 0
+					sm.topRow = 0
+				}
 				availableLines := sm.getAvailableLines()
 				if sm.cursor >= sm.topRow+availableLines {
 					sm.topRow++
