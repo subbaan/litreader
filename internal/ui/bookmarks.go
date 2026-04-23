@@ -48,16 +48,27 @@ func (bm *BookmarksModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// Navigation
 		case "up", "k":
-			if bm.cursor > 0 {
-				bm.cursor--
+			if len(bm.bookmarks) > 0 {
+				if bm.cursor > 0 {
+					bm.cursor--
+				} else {
+					bm.cursor = len(bm.bookmarks) - 1
+					availableLines := bm.getAvailableLines()
+					bm.topRow = max(0, len(bm.bookmarks)-availableLines)
+				}
 				if bm.cursor < bm.topRow {
-					bm.topRow--
+					bm.topRow = bm.cursor
 				}
 			}
 
 		case "down", "j":
-			if bm.cursor < len(bm.bookmarks)-1 {
-				bm.cursor++
+			if len(bm.bookmarks) > 0 {
+				if bm.cursor < len(bm.bookmarks)-1 {
+					bm.cursor++
+				} else {
+					bm.cursor = 0
+					bm.topRow = 0
+				}
 				availableLines := bm.getAvailableLines()
 				if bm.cursor >= bm.topRow+availableLines {
 					bm.topRow++

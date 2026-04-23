@@ -52,16 +52,27 @@ func (fm *FavoritesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// Navigation
 		case "up", "k":
-			if fm.cursor > 0 {
-				fm.cursor--
+			if len(fm.favorites) > 0 {
+				if fm.cursor > 0 {
+					fm.cursor--
+				} else {
+					fm.cursor = len(fm.favorites) - 1
+					availableLines := fm.getAvailableLines()
+					fm.topRow = max(0, len(fm.favorites)-availableLines)
+				}
 				if fm.cursor < fm.topRow {
-					fm.topRow--
+					fm.topRow = fm.cursor
 				}
 			}
 
 		case "down", "j":
-			if fm.cursor < len(fm.favorites)-1 {
-				fm.cursor++
+			if len(fm.favorites) > 0 {
+				if fm.cursor < len(fm.favorites)-1 {
+					fm.cursor++
+				} else {
+					fm.cursor = 0
+					fm.topRow = 0
+				}
 				availableLines := fm.getAvailableLines()
 				if fm.cursor >= fm.topRow+availableLines {
 					fm.topRow++
