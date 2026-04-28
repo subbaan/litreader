@@ -54,6 +54,9 @@ type ViewerModel struct {
 	fileBookmarks    []models.Bookmark
 	bookmarkCursor   int
 
+	// Scroll burst guard
+	lastScrollTime time.Time
+
 	// Error
 	err error
 }
@@ -384,6 +387,11 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// Navigation - scroll viewport directly
 		case "down", "j":
+			now := time.Now()
+			if !vm.lastScrollTime.IsZero() && now.Sub(vm.lastScrollTime) < 15*time.Millisecond {
+				break // XInput2 burst accumulation — discard
+			}
+			vm.lastScrollTime = now
 			if vm.wordWrap {
 				wrapped := wrapLine(vm.prepareLineForDisplay(vm.topRow), vm.width)
 				if vm.wrapTopOffset < len(wrapped)-1 {
@@ -399,6 +407,11 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "up", "k":
+			now := time.Now()
+			if !vm.lastScrollTime.IsZero() && now.Sub(vm.lastScrollTime) < 15*time.Millisecond {
+				break // XInput2 burst accumulation — discard
+			}
+			vm.lastScrollTime = now
 			if vm.wordWrap {
 				if vm.wrapTopOffset > 0 {
 					vm.wrapTopOffset--
@@ -574,6 +587,23 @@ func (vm *ViewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// TODO: Implement other features
 			// case "/": // Search within file
+		}
+
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionPress {
+			now := time.Now()
+			if !vm.lastScrollTime.IsZero() && now.Sub(vm.lastScrollTime) < 15*time.Millisecond {
+				break
+			}
+			vm.lastScrollTime = now
+			switch msg.Button {
+			case tea.MouseButtonWheelDown:
+				vm.wrapTopOffset = 0
+				vm.topRow = min(vm.topRow+3, vm.totalLines-1)
+			case tea.MouseButtonWheelUp:
+				vm.wrapTopOffset = 0
+				vm.topRow = max(vm.topRow-3, 0)
+			}
 		}
 	}
 

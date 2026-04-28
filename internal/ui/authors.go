@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -47,6 +48,9 @@ type AuthorsModel struct {
 	sortMode int // 0=order added, 1=alphabetical
 
 	info authorInfo
+
+	// Scroll burst guard
+	lastScrollTime time.Time
 }
 
 // NewAuthorsModel creates a new authors view
@@ -82,6 +86,11 @@ func (am *AuthorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// Navigation
 		case "up", "k":
+			now := time.Now()
+			if !am.lastScrollTime.IsZero() && now.Sub(am.lastScrollTime) < 15*time.Millisecond {
+				break // XInput2 burst accumulation — discard
+			}
+			am.lastScrollTime = now
 			if len(am.authors) > 0 {
 				if am.cursor > 0 {
 					am.cursor--
@@ -97,6 +106,11 @@ func (am *AuthorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "down", "j":
+			now := time.Now()
+			if !am.lastScrollTime.IsZero() && now.Sub(am.lastScrollTime) < 15*time.Millisecond {
+				break // XInput2 burst accumulation — discard
+			}
+			am.lastScrollTime = now
 			if len(am.authors) > 0 {
 				if am.cursor < len(am.authors)-1 {
 					am.cursor++
@@ -160,6 +174,34 @@ func (am *AuthorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			// Don't handle here - let app.go handle navigation
 			break
+		}
+
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionPress {
+			now := time.Now()
+			if !am.lastScrollTime.IsZero() && now.Sub(am.lastScrollTime) < 15*time.Millisecond {
+				break
+			}
+			am.lastScrollTime = now
+			availableLines := am.getAvailableLines()
+			switch msg.Button {
+			case tea.MouseButtonWheelUp:
+				if len(am.authors) > 0 && am.cursor > 0 {
+					am.cursor--
+					if am.cursor < am.topRow {
+						am.topRow = am.cursor
+					}
+					am.refreshAuthorInfo()
+				}
+			case tea.MouseButtonWheelDown:
+				if len(am.authors) > 0 && am.cursor < len(am.authors)-1 {
+					am.cursor++
+					if am.cursor >= am.topRow+availableLines {
+						am.topRow++
+					}
+					am.refreshAuthorInfo()
+				}
+			}
 		}
 	}
 

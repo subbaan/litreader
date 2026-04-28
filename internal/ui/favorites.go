@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/subbass/litreader/internal/models"
@@ -24,6 +25,9 @@ type FavoritesModel struct {
 	topRow    int
 
 	sortMode int // 0=name, 1=date, 2=rating
+
+	// Scroll burst guard
+	lastScrollTime time.Time
 }
 
 // NewFavoritesModel creates a new favorites view
@@ -52,6 +56,11 @@ func (fm *FavoritesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// Navigation
 		case "up", "k":
+			now := time.Now()
+			if !fm.lastScrollTime.IsZero() && now.Sub(fm.lastScrollTime) < 15*time.Millisecond {
+				break // XInput2 burst accumulation — discard
+			}
+			fm.lastScrollTime = now
 			if len(fm.favorites) > 0 {
 				if fm.cursor > 0 {
 					fm.cursor--
@@ -66,6 +75,11 @@ func (fm *FavoritesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "down", "j":
+			now := time.Now()
+			if !fm.lastScrollTime.IsZero() && now.Sub(fm.lastScrollTime) < 15*time.Millisecond {
+				break // XInput2 burst accumulation — discard
+			}
+			fm.lastScrollTime = now
 			if len(fm.favorites) > 0 {
 				if fm.cursor < len(fm.favorites)-1 {
 					fm.cursor++
@@ -129,6 +143,32 @@ func (fm *FavoritesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			// Don't handle here - let app.go handle navigation
 			break
+		}
+
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionPress {
+			now := time.Now()
+			if !fm.lastScrollTime.IsZero() && now.Sub(fm.lastScrollTime) < 15*time.Millisecond {
+				break
+			}
+			fm.lastScrollTime = now
+			availableLines := fm.getAvailableLines()
+			switch msg.Button {
+			case tea.MouseButtonWheelUp:
+				if len(fm.favorites) > 0 && fm.cursor > 0 {
+					fm.cursor--
+					if fm.cursor < fm.topRow {
+						fm.topRow = fm.cursor
+					}
+				}
+			case tea.MouseButtonWheelDown:
+				if len(fm.favorites) > 0 && fm.cursor < len(fm.favorites)-1 {
+					fm.cursor++
+					if fm.cursor >= fm.topRow+availableLines {
+						fm.topRow++
+					}
+				}
+			}
 		}
 	}
 

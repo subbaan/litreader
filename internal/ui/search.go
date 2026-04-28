@@ -42,6 +42,9 @@ type SearchModel struct {
 	cacheError bool // Whether cache load failed
 	animFrame  int  // Animation frame counter
 	truncated  bool // Whether results were truncated due to limit
+
+	// Scroll burst guard
+	lastScrollTime time.Time
 }
 
 // NewSearchModel creates a new search view
@@ -153,6 +156,11 @@ func (sm *SearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// Navigation
 		case "up", "k":
+			now := time.Now()
+			if !sm.lastScrollTime.IsZero() && now.Sub(sm.lastScrollTime) < 15*time.Millisecond {
+				break // XInput2 burst accumulation — discard
+			}
+			sm.lastScrollTime = now
 			if len(sm.results) > 0 {
 				if sm.cursor > 0 {
 					sm.cursor--
@@ -167,6 +175,11 @@ func (sm *SearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "down", "j":
+			now := time.Now()
+			if !sm.lastScrollTime.IsZero() && now.Sub(sm.lastScrollTime) < 15*time.Millisecond {
+				break // XInput2 burst accumulation — discard
+			}
+			sm.lastScrollTime = now
 			if len(sm.results) > 0 {
 				if sm.cursor < len(sm.results)-1 {
 					sm.cursor++
@@ -270,6 +283,32 @@ func (sm *SearchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			// Don't handle here - let app.go handle navigation
 			break
+		}
+
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionPress {
+			now := time.Now()
+			if !sm.lastScrollTime.IsZero() && now.Sub(sm.lastScrollTime) < 15*time.Millisecond {
+				break
+			}
+			sm.lastScrollTime = now
+			availableLines := sm.getAvailableLines()
+			switch msg.Button {
+			case tea.MouseButtonWheelUp:
+				if len(sm.results) > 0 && sm.cursor > 0 {
+					sm.cursor--
+					if sm.cursor < sm.topRow {
+						sm.topRow = sm.cursor
+					}
+				}
+			case tea.MouseButtonWheelDown:
+				if len(sm.results) > 0 && sm.cursor < len(sm.results)-1 {
+					sm.cursor++
+					if sm.cursor >= sm.topRow+availableLines {
+						sm.topRow++
+					}
+				}
+			}
 		}
 	}
 
