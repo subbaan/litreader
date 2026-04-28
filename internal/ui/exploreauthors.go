@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -38,6 +39,9 @@ type ExploreAuthorsModel struct {
 	// Filtering
 	filterInput textinput.Model
 	filterMode  bool
+
+	// Scroll burst guard
+	lastScrollTime time.Time
 }
 
 // NewExploreAuthorsModel creates a new explore authors view
@@ -230,6 +234,11 @@ func (em *ExploreAuthorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case "up", "k":
 				// Navigate while still in filter mode
+				now := time.Now()
+				if !em.lastScrollTime.IsZero() && now.Sub(em.lastScrollTime) < 15*time.Millisecond {
+					return em, nil // XInput2 burst accumulation — discard
+				}
+				em.lastScrollTime = now
 				if em.cursor > 0 {
 					em.cursor--
 					if em.cursor < em.topRow {
@@ -240,6 +249,11 @@ func (em *ExploreAuthorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case "down", "j":
 				// Navigate while still in filter mode
+				now := time.Now()
+				if !em.lastScrollTime.IsZero() && now.Sub(em.lastScrollTime) < 15*time.Millisecond {
+					return em, nil // XInput2 burst accumulation — discard
+				}
+				em.lastScrollTime = now
 				if em.cursor < len(em.filtered)-1 {
 					em.cursor++
 					availableLines := em.getAvailableLines()
@@ -261,6 +275,11 @@ func (em *ExploreAuthorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// Navigation
 		case "up", "k":
+			now := time.Now()
+			if !em.lastScrollTime.IsZero() && now.Sub(em.lastScrollTime) < 15*time.Millisecond {
+				break // XInput2 burst accumulation — discard
+			}
+			em.lastScrollTime = now
 			if em.cursor > 0 {
 				em.cursor--
 				if em.cursor < em.topRow {
@@ -269,6 +288,11 @@ func (em *ExploreAuthorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "down", "j":
+			now := time.Now()
+			if !em.lastScrollTime.IsZero() && now.Sub(em.lastScrollTime) < 15*time.Millisecond {
+				break // XInput2 burst accumulation — discard
+			}
+			em.lastScrollTime = now
 			if em.cursor < len(em.filtered)-1 {
 				em.cursor++
 				availableLines := em.getAvailableLines()
@@ -323,6 +347,32 @@ func (em *ExploreAuthorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "left":
 			// Don't handle here - let app.go handle navigation
 			break
+		}
+
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionPress {
+			now := time.Now()
+			if !em.lastScrollTime.IsZero() && now.Sub(em.lastScrollTime) < 15*time.Millisecond {
+				break
+			}
+			em.lastScrollTime = now
+			availableLines := em.getAvailableLines()
+			switch msg.Button {
+			case tea.MouseButtonWheelUp:
+				if em.cursor > 0 {
+					em.cursor--
+					if em.cursor < em.topRow {
+						em.topRow = em.cursor
+					}
+				}
+			case tea.MouseButtonWheelDown:
+				if em.cursor < len(em.filtered)-1 {
+					em.cursor++
+					if em.cursor >= em.topRow+availableLines {
+						em.topRow++
+					}
+				}
+			}
 		}
 	}
 

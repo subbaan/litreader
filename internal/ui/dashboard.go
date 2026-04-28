@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/subbass/litreader/internal/library"
@@ -32,6 +33,9 @@ type DashboardModel struct {
 	inProgress []InProgressItem
 	cursor     int
 	topRow     int
+
+	// Scroll burst guard
+	lastScrollTime time.Time
 
 	// Statistics
 	totalFiles  int
@@ -154,6 +158,11 @@ func (dm *DashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// Navigation
 		case "up", "k":
+			now := time.Now()
+			if !dm.lastScrollTime.IsZero() && now.Sub(dm.lastScrollTime) < 15*time.Millisecond {
+				break // XInput2 burst accumulation — discard
+			}
+			dm.lastScrollTime = now
 			if len(dm.inProgress) > 0 {
 				if dm.cursor > 0 {
 					dm.cursor--
@@ -168,6 +177,11 @@ func (dm *DashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "down", "j":
+			now := time.Now()
+			if !dm.lastScrollTime.IsZero() && now.Sub(dm.lastScrollTime) < 15*time.Millisecond {
+				break // XInput2 burst accumulation — discard
+			}
+			dm.lastScrollTime = now
 			if len(dm.inProgress) > 0 {
 				if dm.cursor < len(dm.inProgress)-1 {
 					dm.cursor++
@@ -229,6 +243,32 @@ func (dm *DashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			// Dashboard is the root - quit the app
 			return dm, tea.Quit
+		}
+
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionPress {
+			now := time.Now()
+			if !dm.lastScrollTime.IsZero() && now.Sub(dm.lastScrollTime) < 15*time.Millisecond {
+				break
+			}
+			dm.lastScrollTime = now
+			availableLines := dm.getAvailableLines()
+			switch msg.Button {
+			case tea.MouseButtonWheelUp:
+				if len(dm.inProgress) > 0 && dm.cursor > 0 {
+					dm.cursor--
+					if dm.cursor < dm.topRow {
+						dm.topRow = dm.cursor
+					}
+				}
+			case tea.MouseButtonWheelDown:
+				if len(dm.inProgress) > 0 && dm.cursor < len(dm.inProgress)-1 {
+					dm.cursor++
+					if dm.cursor >= dm.topRow+availableLines {
+						dm.topRow++
+					}
+				}
+			}
 		}
 	}
 

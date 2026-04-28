@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/subbass/litreader/internal/library"
@@ -28,6 +29,9 @@ type AuthorFilesModel struct {
 	cursor       int
 	topRow       int
 	sortMode     int // 0=name, 1=size asc, 2=size desc
+
+	// Scroll burst guard
+	lastScrollTime time.Time
 }
 
 // NewAuthorFilesModel creates a new author files view
@@ -82,6 +86,11 @@ func (afm *AuthorFilesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// Navigation
 		case "up", "k":
+			now := time.Now()
+			if !afm.lastScrollTime.IsZero() && now.Sub(afm.lastScrollTime) < 15*time.Millisecond {
+				break // XInput2 burst accumulation — discard
+			}
+			afm.lastScrollTime = now
 			if afm.cursor > 0 {
 				afm.cursor--
 				if afm.cursor < afm.topRow {
@@ -90,6 +99,11 @@ func (afm *AuthorFilesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "down", "j":
+			now := time.Now()
+			if !afm.lastScrollTime.IsZero() && now.Sub(afm.lastScrollTime) < 15*time.Millisecond {
+				break // XInput2 burst accumulation — discard
+			}
+			afm.lastScrollTime = now
 			if afm.cursor < len(afm.files)-1 {
 				afm.cursor++
 				availableLines := afm.getAvailableLines()
@@ -129,6 +143,32 @@ func (afm *AuthorFilesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			// Don't handle here - let app.go handle navigation
 			break
+		}
+
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionPress {
+			now := time.Now()
+			if !afm.lastScrollTime.IsZero() && now.Sub(afm.lastScrollTime) < 15*time.Millisecond {
+				break
+			}
+			afm.lastScrollTime = now
+			availableLines := afm.getAvailableLines()
+			switch msg.Button {
+			case tea.MouseButtonWheelUp:
+				if afm.cursor > 0 {
+					afm.cursor--
+					if afm.cursor < afm.topRow {
+						afm.topRow = afm.cursor
+					}
+				}
+			case tea.MouseButtonWheelDown:
+				if afm.cursor < len(afm.files)-1 {
+					afm.cursor++
+					if afm.cursor >= afm.topRow+availableLines {
+						afm.topRow++
+					}
+				}
+			}
 		}
 	}
 
