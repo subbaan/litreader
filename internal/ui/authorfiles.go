@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/subbass/litreader/internal/library"
 	"github.com/subbass/litreader/internal/state"
@@ -24,11 +25,16 @@ type AuthorFilesModel struct {
 	authorName   string
 	authorFolder string
 	files        []string
+	filtered     []string
 	favoriteSet  map[string]bool
 	favoritesVer int
 	cursor       int
 	topRow       int
 	sortMode     int // 0=name, 1=size asc, 2=size desc
+
+	// Filtering
+	filterInput textinput.Model
+	filterMode  bool
 
 	// Scroll burst guard
 	lastScrollTime time.Time
@@ -36,6 +42,10 @@ type AuthorFilesModel struct {
 
 // NewAuthorFilesModel creates a new author files view
 func NewAuthorFilesModel(s *state.State, styles *Styles, authorFolder string) *AuthorFilesModel {
+	ti := textinput.New()
+	ti.Placeholder = "Type to filter..."
+	ti.Width = 40
+
 	afm := &AuthorFilesModel{
 		state:        s,
 		styles:       styles,
@@ -46,6 +56,8 @@ func NewAuthorFilesModel(s *state.State, styles *Styles, authorFolder string) *A
 		cursor:       0,
 		topRow:       0,
 		sortMode:     0,
+		filterInput:  ti,
+		filterMode:   false,
 	}
 
 	afm.refreshFavorites()
@@ -72,6 +84,28 @@ func (afm *AuthorFilesModel) findAuthorFiles() {
 	afm.sortFiles()
 }
 
+// applyFilter filters files based on current filter text
+func (afm *AuthorFilesModel) applyFilter() {
+	filterText := strings.ToLower(strings.TrimSpace(afm.filterInput.Value()))
+
+	if filterText == "" {
+		afm.filtered = afm.files
+	} else {
+		afm.filtered = make([]string, 0)
+		for _, file := range afm.files {
+			if strings.Contains(strings.ToLower(filepath.Base(file)), filterText) {
+				afm.filtered = append(afm.filtered, file)
+			}
+		}
+	}
+
+	// Reset cursor if out of bounds
+	if afm.cursor >= len(afm.filtered) {
+		afm.cursor = 0
+		afm.topRow = 0
+	}
+}
+
 // Init initializes the author files view
 func (afm *AuthorFilesModel) Init() tea.Cmd {
 	return nil
@@ -81,8 +115,66 @@ func (afm *AuthorFilesModel) Init() tea.Cmd {
 func (afm *AuthorFilesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	afm.refreshFavorites()
 
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if afm.filterMode {
+			// Handle filter mode keys
+			switch msg.String() {
+			case "esc":
+				// Exit filter mode and clear filter
+				afm.filterMode = false
+				afm.filterInput.Blur()
+				afm.filterInput.SetValue("")
+				afm.applyFilter()
+				return afm, nil
+
+			case "enter":
+				// Exit filter mode but keep filter
+				afm.filterMode = false
+				afm.filterInput.Blur()
+				return afm, nil
+
+			case "up":
+				// Navigate while still in filter mode
+				now := time.Now()
+				if !afm.lastScrollTime.IsZero() && now.Sub(afm.lastScrollTime) < 15*time.Millisecond {
+					return afm, nil // XInput2 burst accumulation — discard
+				}
+				afm.lastScrollTime = now
+				if afm.cursor > 0 {
+					afm.cursor--
+					if afm.cursor < afm.topRow {
+						afm.topRow--
+					}
+				}
+				return afm, nil
+
+			case "down":
+				// Navigate while still in filter mode
+				now := time.Now()
+				if !afm.lastScrollTime.IsZero() && now.Sub(afm.lastScrollTime) < 15*time.Millisecond {
+					return afm, nil // XInput2 burst accumulation — discard
+				}
+				afm.lastScrollTime = now
+				if afm.cursor < len(afm.filtered)-1 {
+					afm.cursor++
+					availableLines := afm.getAvailableLines()
+					if afm.cursor >= afm.topRow+availableLines {
+						afm.topRow++
+					}
+				}
+				return afm, nil
+
+			default:
+				// Update text input
+				afm.filterInput, cmd = afm.filterInput.Update(msg)
+				afm.applyFilter()
+				return afm, cmd
+			}
+		}
+
 		switch msg.String() {
 		// Navigation
 		case "up", "k":
@@ -104,7 +196,7 @@ func (afm *AuthorFilesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break // XInput2 burst accumulation — discard
 			}
 			afm.lastScrollTime = now
-			if afm.cursor < len(afm.files)-1 {
+			if afm.cursor < len(afm.filtered)-1 {
 				afm.cursor++
 				availableLines := afm.getAvailableLines()
 				if afm.cursor >= afm.topRow+availableLines {
@@ -113,13 +205,19 @@ func (afm *AuthorFilesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "pgdown":
-			afm.cursor = min(afm.cursor+10, len(afm.files)-1)
+			afm.cursor = min(afm.cursor+10, len(afm.filtered)-1)
 			availableLines := afm.getAvailableLines()
-			afm.topRow = min(afm.topRow+10, max(0, len(afm.files)-availableLines))
+			afm.topRow = min(afm.topRow+10, max(0, len(afm.filtered)-availableLines))
 
 		case "pgup":
 			afm.cursor = max(afm.cursor-10, 0)
 			afm.topRow = max(afm.topRow-10, 0)
+
+		// Enter filter mode
+		case "/":
+			afm.filterMode = true
+			afm.filterInput.Focus()
+			return afm, textinput.Blink
 
 		// Sort files
 		case "t":
@@ -128,8 +226,8 @@ func (afm *AuthorFilesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Open selected file
 		case "enter", "right":
-			if len(afm.files) > 0 && afm.cursor < len(afm.files) {
-				file := afm.files[afm.cursor]
+			if len(afm.filtered) > 0 && afm.cursor < len(afm.filtered) {
+				file := afm.filtered[afm.cursor]
 				return afm, func() tea.Msg {
 					return openFileMsg{
 						filename:   file,
@@ -162,7 +260,7 @@ func (afm *AuthorFilesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			case tea.MouseButtonWheelDown:
-				if afm.cursor < len(afm.files)-1 {
+				if afm.cursor < len(afm.filtered)-1 {
 					afm.cursor++
 					if afm.cursor >= afm.topRow+availableLines {
 						afm.topRow++
@@ -184,51 +282,69 @@ func (afm *AuthorFilesModel) View() string {
 	var b strings.Builder
 
 	// Title bar
-	title := fmt.Sprintf("Files by %s", afm.authorName)
+	title := fmt.Sprintf("Files by %s (%d)", afm.authorName, len(afm.filtered))
+	if len(afm.files) != len(afm.filtered) {
+		title = fmt.Sprintf("Files by %s (%d/%d)", afm.authorName, len(afm.filtered), len(afm.files))
+	}
 	if len(title) > afm.width-4 {
 		title = title[:afm.width-7] + "..."
 	}
 	b.WriteString(afm.styles.RenderTitle(title, afm.width))
 	b.WriteString("\n\n")
 
-	// Status bar showing sort order and file count
-	sortModes := []string{"Name", "Size Asc", "Size Desc"}
-	sortText := sortModes[afm.sortMode]
-	var statusBar string
-	if len(afm.files) > 0 {
-		statusBar = fmt.Sprintf("Sort by: %s | Result %d/%d", sortText, afm.cursor+1, len(afm.files))
+	// Filter input or status bar showing sort order and file count
+	if afm.filterMode {
+		b.WriteString("  Filter: ")
+		b.WriteString(afm.filterInput.View())
+		b.WriteString("\n")
 	} else {
-		statusBar = "No files found"
+		sortModes := []string{"Name", "Size Asc", "Size Desc"}
+		sortText := sortModes[afm.sortMode]
+		var statusBar string
+		if len(afm.filtered) > 0 {
+			statusBar = fmt.Sprintf("Sort by: %s | Result %d/%d", sortText, afm.cursor+1, len(afm.filtered))
+		} else if len(afm.files) > 0 {
+			statusBar = "No files match the filter"
+		} else {
+			statusBar = "No files found"
+		}
+		if afm.filterInput.Value() != "" {
+			statusBar = fmt.Sprintf("%s | Filter: \"%s\"", statusBar, afm.filterInput.Value())
+		}
+		// Center it
+		padding := (afm.width - len(statusBar)) / 2
+		if padding < 0 {
+			padding = 0
+		}
+		centeredStatus := strings.Repeat(" ", padding) + statusBar + strings.Repeat(" ", afm.width-padding-len(statusBar))
+		if len(centeredStatus) > afm.width {
+			centeredStatus = centeredStatus[:afm.width]
+		}
+		b.WriteString(afm.styles.StatusBar.Render(centeredStatus))
+		b.WriteString("\n")
 	}
-	// Center it
-	padding := (afm.width - len(statusBar)) / 2
-	if padding < 0 {
-		padding = 0
-	}
-	centeredStatus := strings.Repeat(" ", padding) + statusBar + strings.Repeat(" ", afm.width-padding-len(statusBar))
-	if len(centeredStatus) > afm.width {
-		centeredStatus = centeredStatus[:afm.width]
-	}
-	b.WriteString(afm.styles.StatusBar.Render(centeredStatus))
-	b.WriteString("\n")
 
 	// One-line gap
 	b.WriteString("\n")
 
-	if len(afm.files) == 0 {
-		b.WriteString(fmt.Sprintf("  No files found in '%s'. Press 'q' to go back.\n", afm.authorName))
+	if len(afm.filtered) == 0 {
+		if len(afm.files) == 0 {
+			b.WriteString(fmt.Sprintf("  No files found in '%s'. Press 'q' to go back.\n", afm.authorName))
+		} else {
+			b.WriteString("  No files match the filter. Press 'Esc' to clear.\n")
+		}
 	} else {
 
 		availableLines := afm.getAvailableLines()
-		displayCount := min(len(afm.files), availableLines)
+		displayCount := min(len(afm.filtered), availableLines)
 
 		for idx := 0; idx < displayCount; idx++ {
 			itemIdx := afm.topRow + idx
-			if itemIdx >= len(afm.files) {
+			if itemIdx >= len(afm.filtered) {
 				break
 			}
 
-			file := afm.files[itemIdx]
+			file := afm.filtered[itemIdx]
 			isSelected := itemIdx == afm.cursor
 
 			// Get file size
@@ -277,8 +393,13 @@ func (afm *AuthorFilesModel) View() string {
 		currentLines++
 	}
 
-	// Help bar
-	helpText := "↑↓:Scroll ↵:Open t:Sort q:Back"
+	// Help bar - context-aware
+	var helpText string
+	if afm.filterMode {
+		helpText = "Type to filter | ↑↓:Navigate | ↵:Keep filter | Esc:Clear"
+	} else {
+		helpText = "/:Filter ↑↓:Scroll ↵:Open t:Sort q:Back"
+	}
 	b.WriteString(afm.styles.RenderHelpBar(helpText, afm.width))
 
 	return b.String()
@@ -311,6 +432,7 @@ func (afm *AuthorFilesModel) sortFiles() {
 			return sizeI > sizeJ
 		})
 	}
+	afm.applyFilter()
 }
 
 func (afm *AuthorFilesModel) getFileSize(path string) (int64, error) {

@@ -76,6 +76,9 @@ litreader/
 
 ### Changelog
 
+#### v2.7.8
+- Add live filter (`/` key) to the author files view, matching the explore-authors filter
+
 #### v2.6.3
 - Redesigned viewer help bar layout: items are now semantically grouped with pipe separators instead of greedy flow wrapping
 - Help bar uses 3 lines by default (wide/medium terminals) and 4 lines for narrow terminals
