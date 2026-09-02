@@ -129,7 +129,7 @@ Each binary stores its files under `~/.config/<name>/` and `~/.cache/<name>/` au
 
 ## Version
 
-Current: v2.7.3
+Current: v2.7.8
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for technical documentation and changelog.
 

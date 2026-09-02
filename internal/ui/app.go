@@ -418,6 +418,18 @@ func (a *App) View() string {
 func (a *App) handleNavigation(key tea.KeyMsg) tea.Cmd {
 	keyStr := key.String()
 
+	// The author filter owns all keys while it is active. In particular, q is
+	// text input here rather than the app-level back shortcut, and left moves
+	// the text cursor rather than leaving the view.
+	if a.currentView == ViewExploreAuthors && a.exploreAuthors != nil && a.exploreAuthors.filterMode {
+		return nil
+	}
+
+	// Same for the author-files filter (filtering a single author's stories).
+	if a.currentView == ViewAuthorFiles && a.authorFiles != nil && a.authorFiles.filterMode {
+		return nil
+	}
+
 	// Dashboard shortcuts (work from dashboard only)
 	if a.currentView == ViewDashboard {
 		switch keyStr {

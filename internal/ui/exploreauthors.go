@@ -15,7 +15,7 @@ import (
 // AuthorInfo holds computed information about an author
 type AuthorInfo struct {
 	Name       string
-	Folder     string  // Full path
+	Folder     string // Full path
 	FileCount  int
 	TotalSize  int64
 	AvgRating  float64
@@ -232,7 +232,7 @@ func (em *ExploreAuthorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				em.filterInput.Blur()
 				return em, nil
 
-			case "up", "k":
+			case "up":
 				// Navigate while still in filter mode
 				now := time.Now()
 				if !em.lastScrollTime.IsZero() && now.Sub(em.lastScrollTime) < 15*time.Millisecond {
@@ -247,7 +247,7 @@ func (em *ExploreAuthorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return em, nil
 
-			case "down", "j":
+			case "down":
 				// Navigate while still in filter mode
 				now := time.Now()
 				if !em.lastScrollTime.IsZero() && now.Sub(em.lastScrollTime) < 15*time.Millisecond {
